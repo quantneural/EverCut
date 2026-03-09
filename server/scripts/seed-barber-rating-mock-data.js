@@ -9,18 +9,15 @@
  *   3. Creates mock customers and customer profiles
  *   4. Resets the mock shop's employees, services, bookings, and ratings
  *   5. Creates one employee, one service, three completed bookings, and three ratings
- *   6. Writes a summary file with the generated IDs to scripts/barber-rating-mock-data.json
+ *   6. Prints a summary of the seeded IDs to the console
  *
  * Usage:
  *   node scripts/seed-barber-rating-mock-data.js
  *
  * Output:
- *   scripts/barber-rating-mock-data.json   <- gitignored summary of the seeded mock data
+ *   Console output with the generated shop, booking, and rating IDs
  */
 
-import { writeFileSync } from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import connectDB, { disconnectDB } from '../src/config/database.config.js';
 import User from '../src/models/user.model.js';
 import Shop from '../src/models/shop.model.js';
@@ -31,10 +28,6 @@ import Booking from '../src/models/booking.model.js';
 import Rating from '../src/models/rating.model.js';
 import { hashPin } from '../src/services/pin.service.js';
 import { BOOKING_STATUS, PAYMENT_STATUS, ROLES } from '../src/utils/constants.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const OUTPUT_PATH = path.resolve(__dirname, 'barber-rating-mock-data.json');
 
 const BARBER_FIXTURE = {
     firebaseUid: 'test-barber-001',
@@ -292,10 +285,6 @@ const createBookingsAndRatings = async (shop, barberUser, employee, service, cus
     return fixtures;
 };
 
-const writeSummaryFile = (summary) => {
-    writeFileSync(OUTPUT_PATH, `${JSON.stringify(summary, null, 2)}\n`, 'utf-8');
-};
-
 const main = async () => {
     await connectDB();
 
@@ -390,9 +379,8 @@ const main = async () => {
             },
         };
 
-        writeSummaryFile(summary);
         console.log(JSON.stringify(summary, null, 2));
-        console.log(`\nMock data summary written to ${OUTPUT_PATH}`);
+        console.log('\nMock data seeded successfully.');
     } finally {
         await disconnectDB();
     }

@@ -1,22 +1,55 @@
 {
   "info": {
-    "name": "EverCut - Barber Earnings & Ratings",
-    "description": "Earnings tracking and rating management for barber shops",
+    "name": "EverCut - Barber Earnings",
+    "description": "Earnings tracking for barber shops",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]},
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{firebase_token}}",
+        "type": "string"
+      }
+    ]
+  },
   "variable": [
-    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
-    {"key": "api_prefix", "value": "api/v1", "type": "string"},
-    {"key": "firebase_token", "value": "", "type": "string"},
-    {"key": "rating_id", "value": "", "type": "string"}
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "type": "string"
+    },
+    {
+      "key": "firebase_token",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
-    {"name": "Get Earnings", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/earnings", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "earnings"]}, "description": "Get earnings summary from completed bookings.\n\nResponse:\n{\n  \"success\": true,\n  \"data\": {\n    \"totalEarning\": 50000,\n    \"lastMonthEarning\": 15000,\n    \"todayEarning\": 2500\n  }\n}"}},
-    {"name": "Get Shop Ratings", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/ratings", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "ratings"]}, "description": "Get all ratings for the barber's shop with customer details and replies.\n\nResponse:\n{\n  \"success\": true,\n  \"data\": [\n    {\n      \"ratingId\": \"...\",\n      \"rating\": 5,\n      \"review\": \"Great service!\",\n      \"user\": {\n        \"firstName\": \"John\",\n        \"lastName\": \"Doe\",\n        \"email\": \"john@example.com\"\n      },\n      \"reply\": {\n        \"text\": \"Thank you for your feedback!\",\n        \"repliedAt\": \"2024-03-15T10:30:00.000Z\"\n      },\n      \"createdAt\": \"2024-03-15T10:00:00.000Z\"\n    }\n  ]\n}"}},
-    {"name": "Add Reply to Rating", "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/ratings/{{rating_id}}/reply", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "ratings", "{{rating_id}}", "reply"]}, "body": {"mode": "raw", "raw": "{\n  \"replyText\": \"Thank you for your feedback! We're glad you enjoyed our service.\"\n}", "options": {"raw": {"language": "json"}}}, "description": "Add a reply to a customer rating.\n\nRequired Fields:\n- replyText: Reply text (max 500 characters)\n\nBusiness Rules:\n- Only shop owner can reply to ratings on their shop\n- One reply per rating (use update to modify existing reply)\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Reply added successfully\",\n  \"data\": {\n    \"ratingId\": \"...\",\n    \"rating\": 5,\n    \"review\": \"Great service!\",\n    \"user\": {...},\n    \"reply\": {\n      \"text\": \"Thank you for your feedback!\",\n      \"repliedAt\": \"2024-03-15T10:30:00.000Z\"\n    },\n    \"createdAt\": \"2024-03-15T10:00:00.000Z\"\n  }\n}"}},
-    {"name": "Update Reply to Rating", "request": {"method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/ratings/{{rating_id}}/reply", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "ratings", "{{rating_id}}", "reply"]}, "body": {"mode": "raw", "raw": "{\n  \"replyText\": \"Thank you so much! We appreciate your continued support.\"\n}", "options": {"raw": {"language": "json"}}}, "description": "Update an existing reply to a customer rating.\n\nRequired Fields:\n- replyText: Updated reply text (max 500 characters)\n\nBusiness Rules:\n- Only shop owner can update replies on their shop\n- Reply must already exist\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Reply updated successfully\",\n  \"data\": {...}\n}"}},
-    {"name": "Delete Reply from Rating", "request": {"method": "DELETE", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/ratings/{{rating_id}}/reply", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "ratings", "{{rating_id}}", "reply"]}, "description": "Delete a reply from a customer rating.\n\nBusiness Rules:\n- Only shop owner can delete replies on their shop\n- Reply must exist\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Reply deleted successfully\"\n}"}},
-    {"name": "Remove Rating", "request": {"method": "DELETE", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/ratings/{{rating_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "ratings", "{{rating_id}}"]}, "description": "Remove a rating from the shop (barber can remove inappropriate ratings)."}}
+    {
+      "name": "Get Earnings",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/barber/earnings",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "{{api_prefix}}",
+            "barber",
+            "earnings"
+          ]
+        },
+        "description": "Get earnings summary from completed bookings.\n\nResponse:\n{\n  \"success\": true,\n  \"data\": {\n    \"totalEarning\": 50000,\n    \"lastMonthEarning\": 15000,\n    \"todayEarning\": 2500\n  }\n}"
+      }
+    }
   ]
 }

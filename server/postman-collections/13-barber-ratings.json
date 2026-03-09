@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "EverCut - Barber Ratings Mock Data",
+    "name": "EverCut - Barber Ratings",
     "description": "Focused Postman collection for barber rating routes using seeded mock data and the normal Firebase-authenticated barber user.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
