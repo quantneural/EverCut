@@ -9,17 +9,17 @@ This folder contains **12 modular Postman collections** organized by feature/mod
 | # | Collection Name | Endpoints | Description |
 |---|----------------|-----------|-------------|
 | 01 | **Authentication** | 2 | Firebase session bootstrap and health check |
-| 02 | **Customer Profile** | 4 | Profile management, homepage, services by gender |
-| 03 | **Customer Bookings** | 10 | Book, cancel, reschedule, reorder, favorites, employee calendar |
-| 04 | **Customer Shop Discovery** | 5 | Nearby shops, doorstep services, search |
-| 05 | **Customer Ratings** | 3 | Add ratings, view ratings with replies, rating summary |
-| 06 | **Barber Profile & Shop** | 5 | Shop profile, business info, PIN, cover, status |
-| 07 | **Barber Employees** | 4 | Employee CRUD operations |
-| 08 | **Barber Services** | 5 | Service catalog management (single/bundled) |
-| 09 | **Barber Bookings** | 5 | Booking management, stats, status updates |
-| 10 | **Barber Photos** | 5 | Photo gallery management |
-| 11 | **Barber Earnings** | 6 | Earnings tracking, rating management with replies |
-| 12 | **Onboarding** | 2 | Customer and barber profile creation |
+| 02 | **Onboarding** | 2 | Customer and barber profile creation |
+| 03 | **Customer Profile** | 4 | Profile management, homepage, services by gender |
+| 04 | **Customer Bookings** | 10 | Book, cancel, reschedule, reorder, favorites, employee calendar |
+| 05 | **Customer Shop Discovery** | 5 | Nearby shops, doorstep services, search |
+| 06 | **Customer Ratings** | 3 | Add ratings, view ratings with replies, rating summary |
+| 07 | **Barber Profile & Shop** | 5 | Shop profile, business info, PIN, cover, status |
+| 08 | **Barber Employees** | 4 | Employee CRUD operations |
+| 09 | **Barber Services** | 5 | Service catalog management (single/bundled) |
+| 10 | **Barber Bookings** | 5 | Booking management, stats, status updates |
+| 11 | **Barber Photos** | 5 | Photo gallery management |
+| 12 | **Barber Earnings** | 6 | Earnings tracking, rating management with replies |
 
 **Total: 56 endpoints** across 12 collections
 
@@ -39,7 +39,7 @@ This folder contains **12 modular Postman collections** organized by feature/mod
 **Option B: Import Individual Collections**
 1. Open Postman
 2. Click **Import** button
-3. Select individual JSON files (01-authentication.json, 02-customer-profile.json, etc.)
+3. Select individual JSON files (01-authentication.json, 02-onboarding.json, etc.)
 4. Click **Import**
 
 ### Step 2: Configure Collection Variables
@@ -89,13 +89,13 @@ firebase.auth().signInWithPhoneNumber(phoneNumber)
 
 **For Customer:**
 1. Run `01-authentication` → **Create Session**
-2. If new user, run `12-onboarding` → **Complete Customer Profile**
-3. Now you can use all Customer collections (02-05)
+2. If new user, run `02-onboarding` → **Complete Customer Profile**
+3. Now you can use all Customer collections (03-06)
 
 **For Barber:**
 1. Run `01-authentication` → **Create Session**
-2. If new user, run `12-onboarding` → **Complete Barber Profile**
-3. Now you can use all Barber collections (06-11)
+2. If new user, run `02-onboarding` → **Complete Barber Profile**
+3. Now you can use all Barber collections (07-12)
 
 ---
 
@@ -106,15 +106,15 @@ firebase.auth().signInWithPhoneNumber(phoneNumber)
 ```
 01-Authentication
   ↓ Create Session
-12-Onboarding
+02-Onboarding
   ↓ Complete Customer Profile
-02-Customer Profile
+03-Customer Profile
   ↓ Get Profile → Update Profile
-04-Customer Shop Discovery
+05-Customer Shop Discovery
   ↓ Get Nearby Shops → Get Shop Info
-03-Customer Bookings
+04-Customer Bookings
   ↓ Get Employee Calendar → Book Salon → Get Booking Details
-05-Customer Ratings
+06-Customer Ratings
   ↓ Add Rating
 ```
 
@@ -123,19 +123,19 @@ firebase.auth().signInWithPhoneNumber(phoneNumber)
 ```
 01-Authentication
   ↓ Create Session
-12-Onboarding
+02-Onboarding
   ↓ Complete Barber Profile
-06-Barber Profile & Shop
+07-Barber Profile & Shop
   ↓ Get Profile → Update Business Info → Update Cover Image
-07-Barber Employees
+08-Barber Employees
   ↓ Add Employee (repeat for multiple employees)
-08-Barber Services
+09-Barber Services
   ↓ Add Single Service / Add Bundled Service (repeat)
-10-Barber Photos
+11-Barber Photos
   ↓ Upload Photos
-09-Barber Bookings
+10-Barber Bookings
   ↓ Get All Bookings → Update Booking Status
-11-Barber Earnings
+12-Barber Earnings
   ↓ Get Earnings
 ```
 
@@ -149,12 +149,12 @@ firebase.auth().signInWithPhoneNumber(phoneNumber)
 - `firebase_token` - Firebase ID token for authentication
 
 ### Collection-Specific Variables
-- `booking_id` - Set automatically after creating a booking (Collections 03, 09)
-- `shop_id` - Set automatically after getting shop info (Collections 04, 05)
-- `employee_id` - Set automatically after adding employee (Collection 07)
-- `service_id` - Set automatically after adding service (Collection 08)
-- `photo_id` - Set automatically after uploading photos (Collection 10)
-- `rating_id` - For rating removal (Collection 11)
+- `booking_id` - Set automatically after creating a booking (Collections 04, 10)
+- `shop_id` - Set automatically after getting shop info (Collections 05, 06)
+- `employee_id` - Set automatically after adding employee (Collection 08)
+- `service_id` - Set automatically after adding service (Collection 09)
+- `photo_id` - Set automatically after uploading photos (Collection 11)
+- `rating_id` - For rating removal (Collection 12)
 
 **Note:** Variables are automatically set using Test Scripts when you create resources.
 
@@ -322,7 +322,7 @@ All API responses follow this standard format:
 **Solution:** You're using a barber token on a customer endpoint or vice versa. Check your token's role.
 
 ### Issue: "Shop is currently closed"
-**Solution:** Use "Toggle Shop Status" in Collection 06 to open the shop
+**Solution:** Use "Toggle Shop Status" in Collection 07 to open the shop
 
 ### Issue: "Cannot book in the past"
 **Solution:** Use future dates in your booking requests (date must be >= today)
@@ -345,17 +345,17 @@ All API responses follow this standard format:
 
 ### Collection Files (Import these)
 - `01-authentication.json` - Authentication endpoints
-- `02-customer-profile.json` - Customer profile management
-- `03-customer-bookings.json` - Customer booking operations
-- `04-customer-shop-discovery.json` - Shop discovery and search
-- `05-customer-ratings.json` - Rating and review management
-- `06-barber-profile-shop.json` - Barber shop management
-- `07-barber-employees.json` - Employee management
-- `08-barber-services.json` - Service catalog management
-- `09-barber-bookings.json` - Barber booking management
-- `10-barber-photos.json` - Photo gallery management
-- `11-barber-earnings.json` - Earnings and analytics
-- `12-onboarding.json` - Customer and barber onboarding
+- `02-onboarding.json` - Customer and barber onboarding
+- `03-customer-profile.json` - Customer profile management
+- `04-customer-bookings.json` - Customer booking operations
+- `05-customer-shop-discovery.json` - Shop discovery and search
+- `06-customer-ratings.json` - Rating and review management
+- `07-barber-profile-shop.json` - Barber shop management
+- `08-barber-employees.json` - Employee management
+- `09-barber-services.json` - Service catalog management
+- `10-barber-bookings.json` - Barber booking management
+- `11-barber-photos.json` - Photo gallery management
+- `12-barber-earnings.json` - Earnings and analytics
 
 ### Documentation Files
 - `README.md` - This file
