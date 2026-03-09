@@ -2,13 +2,13 @@
 
 ## 📁 Collection Organization
 
-This folder contains **11 modular Postman collections** organized by feature/module for the EverCut Salon & Barber Booking Platform API.
+This folder contains **12 modular Postman collections** organized by feature/module for the EverCut Salon & Barber Booking Platform API.
 
 ### Collections Overview
 
 | # | Collection Name | Endpoints | Description |
 |---|----------------|-----------|-------------|
-| 01 | **Authentication** | 4 | Firebase OTP verification, customer/barber registration, health check |
+| 01 | **Authentication** | 2 | Firebase session bootstrap and health check |
 | 02 | **Customer Profile** | 4 | Profile management, homepage, services by gender |
 | 03 | **Customer Bookings** | 10 | Book, cancel, reschedule, reorder, favorites, employee calendar |
 | 04 | **Customer Shop Discovery** | 5 | Nearby shops, doorstep services, search |
@@ -19,8 +19,9 @@ This folder contains **11 modular Postman collections** organized by feature/mod
 | 09 | **Barber Bookings** | 5 | Booking management, stats, status updates |
 | 10 | **Barber Photos** | 5 | Photo gallery management |
 | 11 | **Barber Earnings** | 6 | Earnings tracking, rating management with replies |
+| 12 | **Onboarding** | 2 | Customer and barber profile creation |
 
-**Total: 56 endpoints** across 11 collections
+**Total: 56 endpoints** across 12 collections
 
 ---
 
@@ -33,7 +34,7 @@ This folder contains **11 modular Postman collections** organized by feature/mod
 2. Click **Import** button (top left)
 3. Select **Folder** tab
 4. Choose the `postman-collections` folder
-5. Click **Import** - all 11 collections will be imported
+5. Click **Import** - all 12 collections will be imported
 
 **Option B: Import Individual Collections**
 1. Open Postman
@@ -88,12 +89,12 @@ firebase.auth().signInWithPhoneNumber(phoneNumber)
 
 **For Customer:**
 1. Run `01-authentication` → **Create Session**
-2. If new user, run **Complete Customer Profile**
+2. If new user, run `12-onboarding` → **Complete Customer Profile**
 3. Now you can use all Customer collections (02-05)
 
 **For Barber:**
 1. Run `01-authentication` → **Create Session**
-2. If new user, run **Complete Barber Profile**
+2. If new user, run `12-onboarding` → **Complete Barber Profile**
 3. Now you can use all Barber collections (06-11)
 
 ---
@@ -104,7 +105,9 @@ firebase.auth().signInWithPhoneNumber(phoneNumber)
 
 ```
 01-Authentication
-  ↓ Create Session → Complete Customer Profile
+  ↓ Create Session
+12-Onboarding
+  ↓ Complete Customer Profile
 02-Customer Profile
   ↓ Get Profile → Update Profile
 04-Customer Shop Discovery
@@ -119,7 +122,9 @@ firebase.auth().signInWithPhoneNumber(phoneNumber)
 
 ```
 01-Authentication
-  ↓ Create Session → Complete Barber Profile
+  ↓ Create Session
+12-Onboarding
+  ↓ Complete Barber Profile
 06-Barber Profile & Shop
   ↓ Get Profile → Update Business Info → Update Cover Image
 07-Barber Employees
@@ -350,6 +355,7 @@ All API responses follow this standard format:
 - `09-barber-bookings.json` - Barber booking management
 - `10-barber-photos.json` - Photo gallery management
 - `11-barber-earnings.json` - Earnings and analytics
+- `12-onboarding.json` - Customer and barber onboarding
 
 ### Documentation Files
 - `README.md` - This file
@@ -384,9 +390,10 @@ All API responses follow this standard format:
 ## 📊 Collection Statistics
 
 ```
-Total Collections: 11
+Total Collections: 12
 Total Endpoints: 56
-Authentication: 4 endpoints
+Authentication: 2 endpoints
+Onboarding: 2 endpoints
 Customer Features: 22 endpoints
 Barber Features: 30 endpoints
 
