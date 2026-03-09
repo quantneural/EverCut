@@ -14,6 +14,28 @@
   "item": [
     {
       "name": "Get Nearby Shops",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.data && Array.isArray(jsonData.data) && jsonData.data.length > 0) {",
+              "        var firstShop = jsonData.data[0];",
+              "        if (firstShop._id || firstShop.shopId) {",
+              "            var shopId = firstShop._id || firstShop.shopId;",
+              "            pm.collectionVariables.set('shop_id', shopId);",
+              "            console.log('Shop ID saved from first nearby shop:', shopId);",
+              "        }",
+              "    }",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
       "request": {
         "method": "GET",
         "header": [],
@@ -46,10 +68,15 @@
           "listen": "test",
           "script": {
             "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "if (pm.response.code === 200) {",
               "    var jsonData = pm.response.json();",
               "    if (jsonData.data && jsonData.data.shop && jsonData.data.shop._id) {",
               "        pm.collectionVariables.set('shop_id', jsonData.data.shop._id);",
+              "        console.log('Shop ID saved:', jsonData.data.shop._id);",
+              "    } else if (jsonData.data && jsonData.data._id) {",
+              "        pm.collectionVariables.set('shop_id', jsonData.data._id);",
+              "        console.log('Shop ID saved:', jsonData.data._id);",
               "    }",
               "}"
             ],

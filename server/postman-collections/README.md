@@ -28,7 +28,28 @@ This folder contains **13 modular Postman collections** organized by feature/mod
 
 ## 🚀 Quick Start
 
-### Step 1: Import Collections into Postman
+### Step 1: Generate Firebase Tokens
+
+Before importing collections, generate test tokens using the provided script:
+
+```bash
+cd server
+node scripts/firebase-token-gen.js
+```
+
+This script will:
+- Create test users in Firebase Auth (if they don't exist)
+- Apply custom claims (CUSTOMER or BARBER role)
+- Generate ID tokens valid for 1 hour
+- Save tokens to `scripts/test-tokens.txt`
+
+**Test Users Created:**
+- `test-customer-001` - Customer role (+15550000001)
+- `test-barber-001` - Barber role (+15550000002)
+
+**Important:** Tokens expire after 1 hour. Re-run the script to refresh them.
+
+### Step 2: Import Collections into Postman
 
 **Option A: Import All Collections at Once**
 1. Open Postman
@@ -43,33 +64,64 @@ This folder contains **13 modular Postman collections** organized by feature/mod
 3. Select individual JSON files (01-authentication.json, 02-onboarding.json, etc.)
 4. Click **Import**
 
-### Step 2: Configure Collection Variables
+### Step 3: Configure Collection Variables
 
-Each collection has built-in variables that need to be configured:
+Each collection has built-in variables. You only need to set the Firebase token:
 
+**Quick Setup (Recommended):**
+1. Open `server/scripts/test-tokens.txt` (generated in Step 1)
+2. Copy the ID token for the role you need (CUSTOMER or BARBER)
+3. In Postman, click on a collection name
+4. Go to **Variables** tab
+5. Paste the token into the **Current Value** field for `firebase_token`
+6. Click **Save**
+
+**Variables (Pre-configured):**
 ```
-base_url: http://localhost:5000
-api_prefix: /api/v1
-firebase_token: YOUR_FIREBASE_ID_TOKEN_HERE
+base_url: http://localhost:5000  (change for production)
+api_prefix: /api/v1  (do not change)
+firebase_token: [PASTE YOUR TOKEN HERE]
 ```
-
-**To set variables:**
-1. Click on a collection name
-2. Go to **Variables** tab
-3. Update **Current Value** for each variable
-4. Click **Save**
 
 **For production:**
 - Change `base_url` to your production API URL (e.g., `https://api.evercut.com`)
+- Keep `api_prefix` as `/api/v1`
+
+**Token Management:**
+- Customer token: Use for collections 01-06
+- Barber token: Use for collections 01-02, 07-13
+- Tokens expire after 1 hour - re-run `firebase-token-gen.js` to refresh
 
 ---
 
 ## 🔐 Authentication Flow
 
-### 1. Get Firebase Token (Client-side)
+### Automated Testing Flow (Recommended)
+
+**Using the Token Generator Script:**
+
+```bash
+# 1. Generate tokens
+cd server
+node scripts/firebase-token-gen.js
+
+# 2. Copy token from scripts/test-tokens.txt
+# 3. Paste into Postman collection variable 'firebase_token'
+# 4. Start testing immediately!
+```
+
+**Test Users:**
+- **Customer:** `test-customer-001` / +15550000001
+- **Barber:** `test-barber-001` / +15550000002
+
+Both users are created automatically by the script with proper roles.
+
+### Manual Token Generation (Production/Real Users)
+
+If you need tokens for real users (not test users):
 
 ```javascript
-// In your mobile/web app
+// In your mobile/web app (for real users)
 firebase.auth().signInWithPhoneNumber(phoneNumber)
   .then(confirmationResult => confirmationResult.confirm(otpCode))
   .then(result => result.user.getIdToken())
@@ -79,24 +131,23 @@ firebase.auth().signInWithPhoneNumber(phoneNumber)
   });
 ```
 
-### 2. Set Token in Postman
+### Testing Workflow
 
-1. Copy the Firebase ID token
-2. In each collection, go to **Variables** tab
-3. Set `firebase_token` to the copied token
-4. Save
+### Testing Workflow
 
-### 3. Test Authentication
+**For Customer Testing:**
+1. Use customer token from `test-tokens.txt`
+2. Run `01-authentication` → **Create Session**
+3. If new user, run `02-onboarding` → **Complete Customer Profile**
+4. Now test all Customer collections (03-06)
 
-**For Customer:**
-1. Run `01-authentication` → **Create Session**
-2. If new user, run `02-onboarding` → **Complete Customer Profile**
-3. Now you can use all Customer collections (03-06)
+**For Barber Testing:**
+1. Use barber token from `test-tokens.txt`
+2. Run `01-authentication` → **Create Session**
+3. If new user, run `02-onboarding` → **Complete Barber Profile**
+4. Now test all Barber collections (07-13)
 
-**For Barber:**
-1. Run `01-authentication` → **Create Session**
-2. If new user, run `02-onboarding` → **Complete Barber Profile**
-3. Now you can use all Barber collections (07-13)
+**Note:** The test users created by `firebase-token-gen.js` are new users, so you'll need to complete onboarding first.
 
 ---
 
@@ -151,17 +202,50 @@ firebase.auth().signInWithPhoneNumber(phoneNumber)
 - `api_prefix` - API version prefix (/api/v1)
 - `firebase_token` - Firebase ID token for authentication
 
-### Collection-Specific Variables
-- `booking_id` - Set automatically after creating a booking (Collections 04, 10)
-- `shop_id` - Set automatically after getting shop info (Collections 05, 06)
-- `employee_id` - Set automatically after adding employee (Collection 08)
-- `service_id` - Set automatically after adding service (Collection 09)
-- `photo_id` - Set automatically after uploading photos (Collection 11)
-- `rating_id_add_reply` - Captured from seeded barber ratings for the add-reply request (Collection 13)
-- `rating_id_update_reply` - Captured from seeded barber ratings for update/delete reply requests (Collection 13)
-- `rating_id_remove_rating` - Captured from seeded barber ratings for the delete-rating request (Collection 13)
+## 🔄 Collection Variables
 
-**Note:** Variables are automatically set using Test Scripts when you create resources.
+### Shared Variables (All Collections)
+- `base_url` - API server URL (default: http://localhost:5000)
+- `api_prefix` - API version prefix (default: /api/v1) - **Do not change**
+- `firebase_token` - Firebase ID token for authentication - **Set this from test-tokens.txt**
+
+### Auto-Captured Variables (Set by Test Scripts)
+These variables are automatically populated when you run certain requests:
+
+| Variable | Captured From | Used In |
+|----------|--------------|---------|
+| `booking_id` | Book Salon, Get All Bookings | Booking operations (Collections 04, 10) |
+| `shop_id` | Get Nearby Shops, Get Shop Info | Shop operations (Collections 05, 06) |
+| `employee_id` | Add Employee | Employee operations (Collection 08) |
+| `service_id` | Add Service | Service operations (Collection 09) |
+| `photo_id` | Upload Photos | Photo operations (Collection 11) |
+| `rating_id_add_reply` | Get Ratings (seeded data) | Add Reply (Collection 13) |
+| `rating_id_update_reply` | Get Ratings (seeded data) | Update/Delete Reply (Collection 13) |
+| `rating_id_remove_rating` | Get Ratings (seeded data) | Remove Rating (Collection 13) |
+
+### Variable Scope Best Practices
+
+**Option 1: Set token in each collection (Current setup)**
+- Each collection has its own `firebase_token` variable
+- Set the token separately in each collection you use
+- Good for testing different roles in different collections
+
+**Option 2: Use Postman Environment (Recommended for teams)**
+1. Create a new Environment in Postman
+2. Add variables: `base_url`, `api_prefix`, `firebase_token`
+3. Select the environment before testing
+4. All collections will use the same token
+
+**Option 3: Collection-level inheritance**
+- Create a parent collection or workspace
+- Set variables at workspace level
+- All collections inherit the values
+
+### Collection-Specific Variables
+
+See the "Auto-Captured Variables" table above for details on which variables are set automatically.
+
+**Note:** Variables are automatically set using Test Scripts when you create resources or list them.
 
 ---
 
@@ -212,6 +296,31 @@ Authorization: Bearer {{firebase_token}}
 ---
 
 ## ⚙️ Advanced Features
+
+### Automated ID Capture
+
+Collections automatically capture resource IDs using test scripts, eliminating manual copy-paste:
+
+**Auto-captured Variables:**
+- `booking_id` - From booking creation or first booking in list
+- `shop_id` - From shop info or first nearby shop
+- `employee_id` - From employee creation
+- `service_id` - From service creation
+- `photo_id` - From photo upload
+- `rating_id_*` - From seeded barber ratings (Collection 13)
+
+**How it works:**
+1. Run a request that creates or lists resources
+2. The test script automatically extracts the ID
+3. Subsequent requests use the captured ID via `{{variable_name}}`
+4. No manual copying needed!
+
+**Example Flow:**
+```
+1. Run "Book Salon" → booking_id auto-captured
+2. Run "Get Booking Details" → uses {{booking_id}} automatically
+3. Run "Cancel Booking" → uses {{booking_id}} automatically
+```
 
 ### Test Scripts
 
@@ -317,32 +426,73 @@ All API responses follow this standard format:
 
 ## 🐛 Troubleshooting
 
-### Issue: "No token provided"
-**Solution:** Set the `firebase_token` variable in the collection
+### Token Issues
 
-### Issue: "Invalid or expired token"
-**Solution:** Firebase tokens expire after 1 hour. Get a new token and update the variable
+#### Issue: "No token provided"
+**Solution:** 
+1. Run `node scripts/firebase-token-gen.js` to generate tokens
+2. Copy token from `scripts/test-tokens.txt`
+3. Set the `firebase_token` variable in the collection
+4. Ensure you're using the correct role token (CUSTOMER vs BARBER)
 
-### Issue: "Access denied. Required role(s): CUSTOMER"
-**Solution:** You're using a barber token on a customer endpoint or vice versa. Check your token's role.
+#### Issue: "Invalid or expired token"
+**Solution:** 
+- Firebase tokens expire after 1 hour
+- Re-run `node scripts/firebase-token-gen.js` to generate fresh tokens
+- Copy the new token to Postman
 
-### Issue: "Shop is currently closed"
+#### Issue: "Access denied. Required role(s): CUSTOMER"
+**Solution:** 
+- You're using a barber token on a customer endpoint or vice versa
+- Check which role the endpoint requires
+- Use the correct token from `test-tokens.txt`:
+  - Customer endpoints (03-06): Use `test-customer-001` token
+  - Barber endpoints (07-13): Use `test-barber-001` token
+  - Auth/Onboarding (01-02): Use appropriate token for the role you're testing
+
+### Onboarding Issues
+
+#### Issue: "User already has a profile"
+**Solution:**
+- The test user has already completed onboarding
+- Skip the onboarding step and proceed to other endpoints
+- Or create a new test user in `firebase-token-gen.js`
+
+### Booking Issues
+### Booking Issues
+
+#### Issue: "Shop is currently closed"
 **Solution:** Use "Toggle Shop Status" in Collection 07 to open the shop
 
-### Issue: "Cannot book in the past"
+#### Issue: "Cannot book in the past"
 **Solution:** Use future dates in your booking requests (date must be >= today)
 
-### Issue: "Employee not available at this date/time"
+#### Issue: "Employee not available at this date/time"
 **Solution:** 
 1. Run "Get Employee Calendar" first to see available slots
 2. Choose an available time slot
 3. Ensure the time is within employee's working hours
 
-### Issue: "Cancellation not allowed within 2 hours of appointment"
+#### Issue: "Cancellation not allowed within 2 hours of appointment"
 **Solution:** Bookings can only be cancelled at least 2 hours before the appointment time
 
-### Issue: "You can only reschedule once"
+#### Issue: "You can only reschedule once"
 **Solution:** Use "Reorder Booking" instead, which creates a new booking
+
+### Variable Issues
+
+#### Issue: Variables like {{booking_id}} or {{shop_id}} are empty
+**Solution:**
+1. Run the request that creates or lists the resource first
+2. Check the test script output in Postman Console (View → Show Postman Console)
+3. Verify the response contains the expected ID field
+4. The variable should auto-populate after a successful request
+
+#### Issue: "Cannot read property '_id' of undefined"
+**Solution:**
+- The API response structure may have changed
+- Check the actual response in Postman
+- Manually set the variable if needed: Collection → Variables → Set current value
 
 ---
 
@@ -425,23 +575,55 @@ For API issues or questions:
 
 ## ✅ Testing Checklist
 
-Before deploying to production, test:
+### Pre-Testing Setup
+- [ ] Run `node scripts/firebase-token-gen.js` to generate test tokens
+- [ ] Import all 13 collections into Postman
+- [ ] Set `firebase_token` variable in each collection (or use collection-level inheritance)
+- [ ] Verify `base_url` points to correct server (localhost:5000 for dev)
 
+### Authentication & Onboarding
 - [ ] Authentication flow (both customer and barber)
 - [ ] Customer registration with photo upload
 - [ ] Barber registration with all required fields and exactly 3 shop images
+
+### Customer Features
+- [ ] Customer profile management
+- [ ] Nearby shops geospatial query
+- [ ] Service search by gender
 - [ ] Booking creation and validation
 - [ ] Booking cancellation (with 2-hour rule)
 - [ ] Booking reschedule (max 1 time)
 - [ ] Employee calendar availability
-- [ ] Nearby shops geospatial query
-- [ ] Service search by gender
 - [ ] Rating submission (one per customer per shop)
-- [ ] Barber rating reply flow (capture seeded IDs, add/update/delete reply, remove rating)
-- [ ] Photo upload (multiple files)
+
+### Barber Features
+- [ ] Shop profile management
+- [ ] Business info updates
+- [ ] PIN management (4 digits)
+- [ ] Cover image upload
 - [ ] Shop status toggle (open/close)
+- [ ] Employee CRUD operations
+- [ ] Service catalog management (single/bundled)
+- [ ] Photo gallery management (multiple files)
+- [ ] Booking management and stats
+- [ ] Booking status updates
 - [ ] Earnings calculation
-- [ ] All error scenarios (invalid data, expired tokens, etc.)
+- [ ] Barber rating reply flow (capture seeded IDs, add/update/delete reply, remove rating)
+
+### Error Scenarios
+- [ ] Invalid data validation
+- [ ] Expired tokens (wait 1 hour or use expired token)
+- [ ] Wrong role access (customer token on barber endpoint)
+- [ ] Missing required fields
+- [ ] Duplicate operations (e.g., rating same shop twice)
+
+### Automation Features
+- [ ] Verify auto-capture of booking_id after booking creation
+- [ ] Verify auto-capture of shop_id from nearby shops
+- [ ] Verify auto-capture of employee_id after employee creation
+- [ ] Verify auto-capture of service_id after service creation
+- [ ] Verify auto-capture of photo_id after photo upload
+- [ ] Verify auto-capture of rating IDs in barber ratings collection
 
 ---
 

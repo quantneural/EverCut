@@ -12,7 +12,41 @@
     {"key": "booking_id", "value": "", "type": "string"}
   ],
   "item": [
-    {"name": "Get All Bookings", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/bookings", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "bookings"]}, "description": "Get all bookings for the shop with customer and employee details."}},
+    {
+      "name": "Get All Bookings",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.data && Array.isArray(jsonData.data) && jsonData.data.length > 0) {",
+              "        var firstBooking = jsonData.data[0];",
+              "        if (firstBooking._id || firstBooking.bookingId) {",
+              "            var bookingId = firstBooking._id || firstBooking.bookingId;",
+              "            pm.collectionVariables.set('booking_id', bookingId);",
+              "            console.log('Booking ID saved from first booking:', bookingId);",
+              "        }",
+              "    }",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/barber/bookings",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "barber", "bookings"]
+        },
+        "description": "Get all bookings for the shop with customer and employee details."
+      }
+    },
     {"name": "Get Booking Stats", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/bookings/stats", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "bookings", "stats"]}, "description": "Get booking statistics: total, pending, completed, cancelled counts."}},
     {"name": "Get Bookings by Status", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/bookings/status?status=pending", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "bookings", "status"], "query": [{"key": "status", "value": "pending", "description": "pending, confirmed, completed, cancelled"}]}, "description": "Get bookings filtered by status with full details."}},
     {"name": "Update Booking Status", "request": {"method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/bookings/{{booking_id}}/status", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "bookings", "{{booking_id}}", "status"]}, "body": {"mode": "raw", "raw": "{\n  \"status\": \"completed\"\n}", "options": {"raw": {"language": "json"}}}, "description": "Update booking status. Allowed: confirmed, completed, cancelled."}},
