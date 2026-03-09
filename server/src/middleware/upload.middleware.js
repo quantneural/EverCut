@@ -20,6 +20,8 @@ const imageFilter = (_req, file, cb) => {
     }
 };
 
+const resolveActorKey = (req) => req.user?._id?.toString() || req.user?.firebaseUid || 'anonymous';
+
 // ── Storage factories ────────────────────────────────────────────────────
 
 const makeStorage = (folderFn) =>
@@ -35,7 +37,7 @@ const makeStorage = (folderFn) =>
 const coverStorage = new CloudinaryStorage({
     cloudinary,
     params: (req, _file) => ({
-        folder: `evercut/shops/cover/${req.user._id}`,
+        folder: `evercut/shops/cover/${resolveActorKey(req)}`,
         allowed_formats: config.upload.allowedImageFormats,
         transformation: [{ width: 1200, height: 600, crop: 'limit' }],
     }),
@@ -45,14 +47,14 @@ const coverStorage = new CloudinaryStorage({
 
 /** Single customer profile photo */
 export const uploadCustomerPhoto = multer({
-    storage: makeStorage((req) => `evercut/customers/${req.user._id}`),
+    storage: makeStorage((req) => `evercut/customers/${resolveActorKey(req)}`),
     limits: { fileSize: config.upload.maxFileSize },
     fileFilter: imageFilter,
 }).single('photo');
 
 /** Single employee photo */
 export const uploadEmployeePhoto = multer({
-    storage: makeStorage((req) => `evercut/shops/employees/${req.user._id}`),
+    storage: makeStorage((req) => `evercut/shops/employees/${resolveActorKey(req)}`),
     limits: { fileSize: config.upload.maxFileSize },
     fileFilter: imageFilter,
 }).single('photo');
@@ -66,10 +68,23 @@ export const uploadShopCover = multer({
 
 /** Multiple shop gallery photos */
 export const uploadShopPhotos = multer({
-    storage: makeStorage((req) => `evercut/shops/gallery/${req.user._id}`),
+    storage: makeStorage((req) => `evercut/shops/gallery/${resolveActorKey(req)}`),
     limits: {
         fileSize: config.upload.maxFileSize,
         files: config.upload.maxFiles,
     },
     fileFilter: imageFilter,
 }).array('photos', config.upload.maxFiles);
+
+/** Barber onboarding shop images (requires 3 files) */
+export const uploadBarberOnboardingImages = multer({
+    storage: makeStorage((req) => `evercut/shops/onboarding/${resolveActorKey(req)}`),
+    limits: {
+        fileSize: config.upload.maxFileSize,
+        files: 3,
+    },
+    fileFilter: imageFilter,
+}).fields([
+    { name: 'shopImages', maxCount: 3 },
+    { name: 'photos', maxCount: 3 },
+]);

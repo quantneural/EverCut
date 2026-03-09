@@ -55,6 +55,22 @@ export const SHOP_CATEGORY = Object.freeze({
 export const ALL_SHOP_CATEGORIES = Object.values(SHOP_CATEGORY);
 
 // ---------------------------------------------------------------------------
+// Shop Amenities
+// ---------------------------------------------------------------------------
+
+export const SHOP_AMENITY = Object.freeze({
+    AIR_CONDITIONING: 'Air Conditioning',
+    WAITING_AREA: 'Waiting Area',
+    DRINKING_WATER: 'Drinking Water',
+    WASHROOMS: 'Washrooms',
+    PARKING_AREA: 'Parking Area',
+    WIFI: 'Wi-Fi',
+    CHARGING_POINTS: 'Charging Points',
+});
+
+export const ALL_SHOP_AMENITIES = Object.values(SHOP_AMENITY);
+
+// ---------------------------------------------------------------------------
 // Days of Week
 // ---------------------------------------------------------------------------
 
@@ -117,6 +133,12 @@ export const GENDER = Object.freeze({
 });
 
 export const ALL_GENDERS = Object.values(GENDER);
+
+// ---------------------------------------------------------------------------
+// Security
+// ---------------------------------------------------------------------------
+
+export const SECURITY_PIN_LENGTH = 4;
 
 // ---------------------------------------------------------------------------
 // Miscellaneous

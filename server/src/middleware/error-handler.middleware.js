@@ -18,7 +18,7 @@ const errorHandler = (err, req, res, _next) => {
     if (err.name === 'MulterError') {
         const messages = {
             LIMIT_FILE_SIZE: 'File too large. Maximum size is 5 MB.',
-            LIMIT_FILE_COUNT: 'Too many files. Maximum is 10.',
+            LIMIT_FILE_COUNT: 'Too many files uploaded.',
             LIMIT_UNEXPECTED_FILE: 'Unexpected file field.',
         };
         const message = messages[err.code] || 'File upload error';
