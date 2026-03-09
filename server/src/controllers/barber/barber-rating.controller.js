@@ -38,3 +38,12 @@ export const deleteReply = async (req, res, next) => {
         next(err);
     }
 };
+
+export const removeRating = async (req, res, next) => {
+    try {
+        const result = await ratingService.removeRating(req.params.id, req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Rating removed'));
+    } catch (err) {
+        next(err);
+    }
+};

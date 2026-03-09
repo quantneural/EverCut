@@ -84,6 +84,6 @@ router.get('/ratings', ratingCtrl.getRatings);
 router.post('/ratings/:id/reply', validate(objectIdParamSchema, 'params'), validate(addReplySchema, 'body'), ratingCtrl.addReply);
 router.put('/ratings/:id/reply', validate(objectIdParamSchema, 'params'), validate(addReplySchema, 'body'), ratingCtrl.updateReply);
 router.delete('/ratings/:id/reply', validate(objectIdParamSchema, 'params'), ratingCtrl.deleteReply);
-router.delete('/ratings/:id', validate(objectIdParamSchema, 'params'), earningsCtrl.removeRating);
+router.delete('/ratings/:id', validate(objectIdParamSchema, 'params'), ratingCtrl.removeRating);
 
 export default router;
