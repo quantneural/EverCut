@@ -2,7 +2,7 @@
 
 ## 📁 Collection Organization
 
-This folder contains **12 modular Postman collections** organized by feature/module for the EverCut Salon & Barber Booking Platform API.
+This folder contains **13 modular Postman collections** organized by feature/module for the EverCut Salon & Barber Booking Platform API.
 
 ### Collections Overview
 
@@ -11,7 +11,7 @@ This folder contains **12 modular Postman collections** organized by feature/mod
 | 01 | **Authentication** | 2 | Firebase session bootstrap and health check |
 | 02 | **Onboarding** | 2 | Customer and barber profile creation |
 | 03 | **Customer Profile** | 4 | Profile management, homepage, services by gender |
-| 04 | **Customer Bookings** | 10 | Book, cancel, reschedule, reorder, favorites, employee calendar |
+| 04 | **Customer Bookings** | 11 | Book, cancel, reschedule, reorder, favorites, employee calendar |
 | 05 | **Customer Shop Discovery** | 5 | Nearby shops, doorstep services, search |
 | 06 | **Customer Ratings** | 3 | Add ratings, view ratings with replies, rating summary |
 | 07 | **Barber Profile & Shop** | 5 | Shop profile, business info, PIN, cover, status |
@@ -19,9 +19,10 @@ This folder contains **12 modular Postman collections** organized by feature/mod
 | 09 | **Barber Services** | 5 | Service catalog management (single/bundled) |
 | 10 | **Barber Bookings** | 5 | Booking management, stats, status updates |
 | 11 | **Barber Photos** | 5 | Photo gallery management |
-| 12 | **Barber Earnings** | 6 | Earnings tracking, rating management with replies |
+| 12 | **Barber Earnings** | 1 | Earnings tracking and summary |
+| 13 | **Barber Ratings** | 5 | Barber-side rating moderation, replies, and rating removal |
 
-**Total: 56 endpoints** across 12 collections
+**Total: 57 endpoints** across 13 collections
 
 ---
 
@@ -34,7 +35,7 @@ This folder contains **12 modular Postman collections** organized by feature/mod
 2. Click **Import** button (top left)
 3. Select **Folder** tab
 4. Choose the `postman-collections` folder
-5. Click **Import** - all 12 collections will be imported
+5. Click **Import** - all 13 collections will be imported
 
 **Option B: Import Individual Collections**
 1. Open Postman
@@ -95,7 +96,7 @@ firebase.auth().signInWithPhoneNumber(phoneNumber)
 **For Barber:**
 1. Run `01-authentication` → **Create Session**
 2. If new user, run `02-onboarding` → **Complete Barber Profile**
-3. Now you can use all Barber collections (07-12)
+3. Now you can use all Barber collections (07-13)
 
 ---
 
@@ -137,6 +138,8 @@ firebase.auth().signInWithPhoneNumber(phoneNumber)
   ↓ Get All Bookings → Update Booking Status
 12-Barber Earnings
   ↓ Get Earnings
+13-Barber Ratings
+  ↓ Get Ratings And Capture Seeded IDs → Add Reply / Update Reply / Delete Reply → Remove Rating
 ```
 
 ---
@@ -154,7 +157,9 @@ firebase.auth().signInWithPhoneNumber(phoneNumber)
 - `employee_id` - Set automatically after adding employee (Collection 08)
 - `service_id` - Set automatically after adding service (Collection 09)
 - `photo_id` - Set automatically after uploading photos (Collection 11)
-- `rating_id` - For rating removal (Collection 12)
+- `rating_id_add_reply` - Captured from seeded barber ratings for the add-reply request (Collection 13)
+- `rating_id_update_reply` - Captured from seeded barber ratings for update/delete reply requests (Collection 13)
+- `rating_id_remove_rating` - Captured from seeded barber ratings for the delete-rating request (Collection 13)
 
 **Note:** Variables are automatically set using Test Scripts when you create resources.
 
@@ -355,16 +360,14 @@ All API responses follow this standard format:
 - `09-barber-services.json` - Service catalog management
 - `10-barber-bookings.json` - Barber booking management
 - `11-barber-photos.json` - Photo gallery management
-- `12-barber-earnings.json` - Earnings and analytics
+- `12-barber-earnings.json` - Earnings tracking and summary
+- `13-barber-ratings.json` - Barber rating moderation, reply management, and seeded ID capture
 
 ### Documentation Files
 - `README.md` - This file
-- `POSTMAN_COLLECTION_README.md` - Detailed API documentation
-- `.postman.json` - Metadata file
 
 ### Archive Files (Reference only)
-- `evercut-postman-collection.json` - Original monolithic collection
-- `evercut-collection-formatted.json` - Formatted version
+- No archive collection files are currently stored in this folder
 
 ---
 
@@ -390,14 +393,14 @@ All API responses follow this standard format:
 ## 📊 Collection Statistics
 
 ```
-Total Collections: 12
-Total Endpoints: 56
+Total Collections: 13
+Total Endpoints: 57
 Authentication: 2 endpoints
 Onboarding: 2 endpoints
-Customer Features: 22 endpoints
+Customer Features: 23 endpoints
 Barber Features: 30 endpoints
 
-File Size: ~160KB total
+File Size: ~65KB total
 Format: Postman Collection v2.1.0
 ```
 
@@ -414,7 +417,7 @@ Format: Postman Collection v2.1.0
 ## 📞 Support
 
 For API issues or questions:
-- Check the detailed documentation in `POSTMAN_COLLECTION_README.md`
+- Check the collection notes and workflow guidance in this README
 - Review the architecture documentation in `../docs/` folder
 - Test endpoints in the order specified in the workflows above
 
@@ -434,6 +437,7 @@ Before deploying to production, test:
 - [ ] Nearby shops geospatial query
 - [ ] Service search by gender
 - [ ] Rating submission (one per customer per shop)
+- [ ] Barber rating reply flow (capture seeded IDs, add/update/delete reply, remove rating)
 - [ ] Photo upload (multiple files)
 - [ ] Shop status toggle (open/close)
 - [ ] Earnings calculation
@@ -442,6 +446,6 @@ Before deploying to production, test:
 ---
 
 **Version:** 1.0.0  
-**Last Updated:** 2024  
+**Last Updated:** March 9, 2026  
 **API Version:** v1  
 **Format:** Postman Collection v2.1.0
