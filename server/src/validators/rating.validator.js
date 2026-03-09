@@ -1,8 +1,9 @@
 import Joi from 'joi';
+import { objectId } from './common.validator.js';
 
 export const addRatingSchema = Joi.object({
-    shopId: Joi.string().required().messages({
-        'string.empty': 'Shop ID is required',
+    shopId: objectId.required().messages({
+        'any.invalid': 'Shop ID must be a valid ID',
         'any.required': 'Shop ID is required',
     }),
     rating: Joi.number().integer().min(1).max(5).required().messages({

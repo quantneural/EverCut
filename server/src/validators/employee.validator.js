@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import { ALL_GENDERS } from '../utils/constants.js';
+import { objectId } from './common.validator.js';
 
 export const addEmployeeSchema = Joi.object({
     firstName: Joi.string().trim().min(1).max(50).required(),
@@ -7,6 +8,13 @@ export const addEmployeeSchema = Joi.object({
     phoneNumber: Joi.string().required(),
     gender: Joi.string().valid(...ALL_GENDERS).required(),
     dateOfBirth: Joi.date().required(),
+    workingHours: Joi.alternatives().try(
+        Joi.object({
+            start: Joi.string().required(),
+            end: Joi.string().required(),
+        }),
+        Joi.string(),
+    ),
     blockedDates: Joi.array().items(Joi.date()).default([]),
 });
 
@@ -22,3 +30,7 @@ export const updateEmployeeSchema = Joi.object({
     }),
     blockedDates: Joi.array().items(Joi.date()),
 }).min(1);
+
+export const employeeIdParamSchema = Joi.object({
+    id: objectId.required(),
+});

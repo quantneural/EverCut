@@ -5,7 +5,7 @@ import { validate } from '../middleware/validate.middleware.js';
 import {
     customerOnboardingSchema,
     barberOnboardingSchema,
-} from '../validators/auth.validator.js';
+} from '../validators/onboarding.validator.js';
 import * as onboardingController from '../controllers/onboarding.controller.js';
 
 const router = Router();

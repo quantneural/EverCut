@@ -14,10 +14,7 @@ export const getShopInfo = async (req, res, next) => {
 export const getNearbyShops = async (req, res, next) => {
     try {
         const { longitude, latitude } = req.query;
-        if (!longitude || !latitude) {
-            return res.status(400).json(ApiResponse.error('longitude and latitude are required', 400));
-        }
-        const shops = await shopService.getNearbyShops([parseFloat(longitude), parseFloat(latitude)]);
+        const shops = await shopService.getNearbyShops([Number(longitude), Number(latitude)]);
         return res.status(200).json(ApiResponse.success(shops, 'Nearby shops fetched'));
     } catch (err) {
         next(err);
@@ -36,11 +33,8 @@ export const getDoorstepShops = async (req, res, next) => {
 export const getServicesByGender = async (req, res, next) => {
     try {
         const { longitude, latitude, gender, search } = req.query;
-        if (!longitude || !latitude) {
-            return res.status(400).json(ApiResponse.error('longitude and latitude are required', 400));
-        }
         const result = await shopService.getNearbyServicesByGender(
-            [parseFloat(longitude), parseFloat(latitude)],
+            [Number(longitude), Number(latitude)],
             gender || 'unisex',
             search,
         );
@@ -53,7 +47,6 @@ export const getServicesByGender = async (req, res, next) => {
 export const searchServices = async (req, res, next) => {
     try {
         const { query: q, gender } = req.query;
-        if (!q) return res.status(400).json(ApiResponse.error('query parameter is required', 400));
         const results = await serviceCatalogService.searchServices(q, gender);
         return res.status(200).json(ApiResponse.success(results, 'Search results'));
     } catch (err) {
@@ -64,7 +57,6 @@ export const searchServices = async (req, res, next) => {
 export const searchShops = async (req, res, next) => {
     try {
         const { query: q } = req.query;
-        if (!q) return res.status(400).json(ApiResponse.error('query parameter is required', 400));
         const results = await serviceCatalogService.searchShops(q);
         return res.status(200).json(ApiResponse.success(results, 'Shop search results'));
     } catch (err) {

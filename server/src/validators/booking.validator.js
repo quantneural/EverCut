@@ -30,5 +30,26 @@ export const updateBookingSchema = Joi.object({
 });
 
 export const bookingStatusSchema = Joi.object({
+    status: Joi.string().valid('confirmed', 'completed', 'cancelled').required(),
+});
+
+export const customerBookingsQuerySchema = Joi.object({
+    type: Joi.string().valid('past', 'upcoming', 'favorites').required(),
+});
+
+export const bookingIdParamSchema = Joi.object({
+    id: objectId.required(),
+});
+
+export const bookingServiceParamsSchema = Joi.object({
+    id: objectId.required(),
+    serviceId: objectId.required(),
+});
+
+export const employeeCalendarQuerySchema = Joi.object({
+    date: dateString.required(),
+});
+
+export const bookingsByStatusQuerySchema = Joi.object({
     status: Joi.string().valid('pending', 'confirmed', 'completed', 'cancelled').required(),
 });
