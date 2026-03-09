@@ -124,7 +124,7 @@ firebase.auth().signInWithPhoneNumber(phoneNumber)
 01-Authentication
   ↓ Create Session
 02-Onboarding
-  ↓ Complete Barber Profile
+  ↓ Complete Barber Profile (multipart + 3 shop images)
 07-Barber Profile & Shop
   ↓ Get Profile → Update Business Info → Update Cover Image
 08-Barber Employees
@@ -257,7 +257,7 @@ Some requests include pre-request scripts for:
 - Reply Management: Shop owners can add, update, or delete their replies
 
 ### PIN Rules
-- 4-6 digits only
+- Exactly 4 digits only
 - Required for barber shop access
 - Stored as bcrypt hash
 
@@ -426,7 +426,7 @@ Before deploying to production, test:
 
 - [ ] Authentication flow (both customer and barber)
 - [ ] Customer registration with photo upload
-- [ ] Barber registration with all required fields
+- [ ] Barber registration with all required fields and exactly 3 shop images
 - [ ] Booking creation and validation
 - [ ] Booking cancellation (with 2-hour rule)
 - [ ] Booking reschedule (max 1 time)
