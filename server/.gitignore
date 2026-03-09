@@ -1,0 +1,124 @@
+# Dependencies
+node_modules/
+.npm
+.yarn
+.pnp.*
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Firebase service account keys or any secrets
+firebase-admin-sdk.json
+*-firebase-adminsdk-*.json
+
+# Uploaded files
+/uploads/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pids/
+*.pid
+*.seed
+*.pid.lock
+.pm2/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Build output (if any)
+/dist/
+/build/
+
+# VSCode settings
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Testing & Coverage
+coverage/
+*.lcov
+.nyc_output/
+test-results/
+.cache/
+
+# IDE/Editor files
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# dotenv environment variable files
+.env.test
+.env.production
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# Webpack
+.webpack/
+
+# Postman test tokens and sensitive data
+postman-collections/test-tokens.txt
+postman-collections/*-tokens.txt
+
+# Firebase test tokens (in any location)
+test-tokens.json
+test-tokens.txt
+firebase-tokens.txt
+custom-tokens.txt
+scripts/test-tokens.txt
+scripts/*-tokens.txt

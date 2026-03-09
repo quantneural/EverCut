@@ -1,0 +1,21 @@
+{
+  "info": {
+    "name": "EverCut - Barber Photos",
+    "description": "Photo gallery management for barber shops",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]},
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
+    {"key": "api_prefix", "value": "api/v1", "type": "string"},
+    {"key": "firebase_token", "value": "", "type": "string"},
+    {"key": "photo_id", "value": "", "type": "string"}
+  ],
+  "item": [
+    {"name": "Get All Photos", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/photos", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "photos"]}, "description": "Get all shop photos."}},
+    {"name": "Upload Photos", "event": [{"listen": "test", "script": {"exec": ["if (pm.response.code === 201) {", "    var jsonData = pm.response.json();", "    if (jsonData.data && jsonData.data.length > 0) {", "        pm.collectionVariables.set('photo_id', jsonData.data[0]._id);", "    }", "}"], "type": "text/javascript"}}], "request": {"method": "POST", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/photos", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "photos"]}, "body": {"mode": "formdata", "formdata": [{"key": "photos", "type": "file", "src": "", "description": "Multiple photos (max 10)"}, {"key": "photoType", "value": "shop_interior", "type": "text", "description": "shop_interior, shop_exterior, work_sample, team_photo, certificate, other"}, {"key": "description", "value": "Shop interior view", "type": "text"}]}, "description": "Upload multiple shop photos (max 10 per upload)."}},
+    {"name": "Get Photo by ID", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/photos/{{photo_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "photos", "{{photo_id}}"]}, "description": "Get specific photo details."}},
+    {"name": "Delete Photo", "request": {"method": "DELETE", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/photos/{{photo_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "photos", "{{photo_id}}"]}, "description": "Delete photo from Cloudinary and database."}},
+    {"name": "Get Photo Stats", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/photos/stats", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "photos", "stats"]}, "description": "Get photo statistics (count, storage used)."}}
+  ]
+}

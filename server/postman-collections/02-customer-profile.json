@@ -1,0 +1,83 @@
+{
+  "info": {
+    "name": "EverCut - Customer Profile",
+    "description": "Customer profile management and homepage endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]
+  },
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
+    {"key": "api_prefix", "value": "api/v1", "type": "string"},
+    {"key": "firebase_token", "value": "", "type": "string"}
+  ],
+  "item": [
+    {
+      "name": "Get Profile",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/profile",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "profile"]
+        },
+        "description": "Get customer profile information.\n\nRequires: CUSTOMER role\n\nResponse:\n{\n  \"success\": true,\n  \"data\": {\n    \"_id\": \"...\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"email\": \"john@example.com\",\n    \"phoneNumber\": \"+1234567890\",\n    \"gender\": \"Male\",\n    \"dateOfBirth\": \"1990-01-01\",\n    \"address\": \"123 Main St\",\n    \"photoUrl\": \"https://...\",\n    \"location\": {...}\n  }\n}"
+      }
+    },
+    {
+      "name": "Update Profile",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/profile",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "profile"]
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {"key": "firstName", "value": "John", "type": "text"},
+            {"key": "lastName", "value": "Doe", "type": "text"},
+            {"key": "address", "value": "456 New Street", "type": "text"},
+            {"key": "photo", "type": "file", "src": "", "description": "Optional new profile photo"}
+          ]
+        },
+        "description": "Update customer profile with optional photo upload.\n\nOptional Fields: firstName, lastName, address, gender, dateOfBirth, photo\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Profile updated\",\n  \"data\": {...}\n}"
+      }
+    },
+    {
+      "name": "Get Homepage",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/homepage",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "homepage"]
+        },
+        "description": "Get customer homepage/dashboard with personalized content.\n\nResponse:\n{\n  \"success\": true,\n  \"data\": {\n    \"profile\": {...},\n    \"upcomingBookings\": [...],\n    \"nearbyShops\": [...],\n    \"recommendations\": [...]\n  }\n}"
+      }
+    },
+    {
+      "name": "Get Services by Gender",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/homepage/services?gender=male&coordinates=-73.935242,40.730610",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "homepage", "services"],
+          "query": [
+            {"key": "gender", "value": "male", "description": "male, female, or unisex"},
+            {"key": "coordinates", "value": "-73.935242,40.730610", "description": "longitude,latitude"}
+          ]
+        },
+        "description": "Get services filtered by gender from nearby shops.\n\nQuery Parameters:\n- gender: male, female, or unisex\n- coordinates: longitude,latitude\n\nResponse:\n{\n  \"success\": true,\n  \"data\": {\n    \"shops\": [...],\n    \"services\": [...]\n  }\n}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+{
+  "info": {
+    "name": "EverCut - Authentication",
+    "description": "Firebase-based authentication endpoints for customer and barber registration",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{firebase_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "type": "string"
+    },
+    {
+      "key": "firebase_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Create Session",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/auth/session",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "auth", "session"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Create auth session context after Firebase token verification. Returns profile if user already exists, or indicates the user must complete onboarding.\n\nRequest Body:\n- Optional: roleType ('CUSTOMER' or 'BARBER'), deprecated and ignored by backend.\n\nResponse (New User):\n{\n  \"success\": true,\n  \"message\": \"New user. Please complete your profile.\",\n  \"data\": {\n    \"isNewUser\": true,\n    \"firebaseUid\": \"abc123\",\n    \"phoneNumber\": \"+1234567890\"\n  }\n}\n\nResponse (Existing User):\n{\n  \"success\": true,\n  \"message\": \"Login successful\",\n  \"data\": {\n    \"isNewUser\": false,\n    \"user\": {...},\n    \"profile\": {...}\n  }\n}"
+      }
+    },
+    {
+      "name": "Complete Customer Profile",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/onboarding/customers",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "onboarding", "customers"]
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {"key": "firstName", "value": "John", "type": "text", "description": "Customer first name"},
+            {"key": "lastName", "value": "Doe", "type": "text", "description": "Customer last name"},
+            {"key": "phoneNumber", "value": "+1234567890", "type": "text", "description": "Phone number with country code"},
+            {"key": "email", "value": "john@example.com", "type": "text", "description": "Email address"},
+            {"key": "gender", "value": "Male", "type": "text", "description": "Male, Female, or Other"},
+            {"key": "dateOfBirth", "value": "1990-01-01", "type": "text", "description": "Date of birth (YYYY-MM-DD)"},
+            {"key": "address", "value": "123 Main St, New York, NY", "type": "text", "description": "Full address"},
+            {"key": "location", "value": "{\"type\":\"Point\",\"coordinates\":[-73.935242,40.730610]}", "type": "text", "description": "GeoJSON Point with [longitude, latitude]"},
+            {"key": "photo", "type": "file", "src": "", "description": "Profile photo (required)"}
+          ]
+        },
+        "description": "Complete customer registration with profile photo upload. Creates User and CustomerProfile records.\n\nRequired Fields:\n- firstName, lastName, phoneNumber, email, gender, dateOfBirth, address, location, photo\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Customer profile created\",\n  \"data\": {\n    \"user\": {...},\n    \"profile\": {...}\n  }\n}"
+      }
+    },
+    {
+      "name": "Complete Barber Profile",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/onboarding/barbers",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "onboarding", "barbers"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"shopName\": \"Elite Barber Shop\",\n  \"shopOwner\": \"John Smith\",\n  \"shopCategory\": \"Barber\",\n  \"phoneNumber\": \"+1234567890\",\n  \"emailId\": \"shop@example.com\",\n  \"upiId\": \"shop@upi\",\n  \"bio\": \"Premium barber services since 2010\",\n  \"address\": \"456 Shop Street, New York, NY\",\n  \"location\": {\n    \"type\": \"Point\",\n    \"coordinates\": [-73.935242, 40.730610]\n  },\n  \"numberOfEmployees\": 5,\n  \"yearsOfExperience\": 10,\n  \"facilities\": [\"WiFi\", \"AC\", \"Parking\", \"Card Payment\"],\n  \"availableDays\": [\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\", \"Saturday\"],\n  \"openTime\": \"09:00\",\n  \"closeTime\": \"20:00\",\n  \"breakTimes\": [{\"start\": \"13:00\", \"end\": \"14:00\"}],\n  \"pin\": \"1234\",\n  \"confirmPin\": \"1234\"\n}",
+          "options": {"raw": {"language": "json"}}
+        },
+        "description": "Complete barber/shop registration. Creates User and Shop records with hashed PIN.\n\nRequired Fields:\n- shopName, shopOwner, shopCategory, phoneNumber, emailId, upiId, address, location\n- numberOfEmployees, yearsOfExperience, availableDays, openTime, closeTime\n- pin (4-6 digits), confirmPin (must match pin)\n\nShop Categories:\n- Salon, Beauty Parlour, Barber, Door-Step\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Barber profile created\",\n  \"data\": {\n    \"user\": {...},\n    \"shop\": {...}\n  }\n}"
+      }
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/health",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "health"]
+        },
+        "description": "API health check endpoint to verify the server is running.\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"EverCut API is running\",\n  \"timestamp\": \"2024-03-15T10:30:00.000Z\"\n}"
+      }
+    }
+  ]
+}

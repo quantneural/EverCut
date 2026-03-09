@@ -1,0 +1,20 @@
+{
+  "info": {
+    "name": "EverCut - Barber Employees",
+    "description": "Employee management for barber shops",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]},
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
+    {"key": "api_prefix", "value": "api/v1", "type": "string"},
+    {"key": "firebase_token", "value": "", "type": "string"},
+    {"key": "employee_id", "value": "", "type": "string"}
+  ],
+  "item": [
+    {"name": "Get All Employees", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/employees", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "employees"]}, "description": "Get all employees for the shop."}},
+    {"name": "Add Employee", "event": [{"listen": "test", "script": {"exec": ["if (pm.response.code === 201) {", "    var jsonData = pm.response.json();", "    if (jsonData.data && jsonData.data._id) {", "        pm.collectionVariables.set('employee_id', jsonData.data._id);", "    }", "}"], "type": "text/javascript"}}], "request": {"method": "POST", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/employees", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "employees"]}, "body": {"mode": "formdata", "formdata": [{"key": "firstName", "value": "Jane", "type": "text"}, {"key": "lastName", "value": "Smith", "type": "text"}, {"key": "phoneNumber", "value": "+1234567891", "type": "text"}, {"key": "gender", "value": "Female", "type": "text"}, {"key": "dateOfBirth", "value": "1995-05-15", "type": "text"}, {"key": "workingHours", "value": "{\"start\":\"09:00\",\"end\":\"18:00\"}", "type": "text"}, {"key": "photo", "type": "file", "src": ""}]}, "description": "Add new employee with photo."}},
+    {"name": "Update Employee", "request": {"method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/employees/{{employee_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "employees", "{{employee_id}}"]}, "body": {"mode": "raw", "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"workingHours\": {\"start\": \"10:00\", \"end\": \"19:00\"}\n}", "options": {"raw": {"language": "json"}}}, "description": "Update employee details. All fields are optional."}},
+    {"name": "Delete Employee", "request": {"method": "DELETE", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/employees/{{employee_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "employees", "{{employee_id}}"]}, "description": "Delete employee (soft delete)."}}
+  ]
+}

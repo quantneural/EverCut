@@ -1,0 +1,103 @@
+{
+  "info": {
+    "name": "EverCut - Customer Shop Discovery",
+    "description": "Shop discovery, search, and information endpoints for customers",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]},
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
+    {"key": "api_prefix", "value": "api/v1", "type": "string"},
+    {"key": "firebase_token", "value": "", "type": "string"},
+    {"key": "shop_id", "value": "", "type": "string"}
+  ],
+  "item": [
+    {
+      "name": "Get Nearby Shops",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/shops/nearby?coordinates=-73.935242,40.730610",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "shops", "nearby"],
+          "query": [{"key": "coordinates", "value": "-73.935242,40.730610", "description": "longitude,latitude"}]
+        },
+        "description": "Get shops within 2km radius using geospatial query.\n\nQuery Parameters:\n- coordinates: longitude,latitude (required)\n\nResponse includes distance in km from your location."
+      }
+    },
+    {
+      "name": "Get Doorstep Shops",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/shops/doorstep",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "shops", "doorstep"]
+        },
+        "description": "Get shops offering doorstep/home services."
+      }
+    },
+    {
+      "name": "Get Shop Info",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.data && jsonData.data.shop && jsonData.data.shop._id) {",
+              "        pm.collectionVariables.set('shop_id', jsonData.data.shop._id);",
+              "    }",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/shops/{{shop_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "shops", "{{shop_id}}"]
+        },
+        "description": "Get complete shop information including services, photos, and ratings."
+      }
+    },
+    {
+      "name": "Search Services",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/search/services?query=haircut&gender=male",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "search", "services"],
+          "query": [
+            {"key": "query", "value": "haircut", "description": "Service name to search"},
+            {"key": "gender", "value": "male", "description": "male, female, or unisex"}
+          ]
+        },
+        "description": "Search services by name and filter by gender."
+      }
+    },
+    {
+      "name": "Search Shops",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/search/shops?query=elite",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "search", "shops"],
+          "query": [{"key": "query", "value": "elite", "description": "Shop name to search"}]
+        },
+        "description": "Search shops by name or category."
+      }
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "info": {
+    "name": "EverCut - Barber Bookings",
+    "description": "Booking management and statistics for barber shops",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]},
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
+    {"key": "api_prefix", "value": "api/v1", "type": "string"},
+    {"key": "firebase_token", "value": "", "type": "string"},
+    {"key": "booking_id", "value": "", "type": "string"}
+  ],
+  "item": [
+    {"name": "Get All Bookings", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/bookings", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "bookings"]}, "description": "Get all bookings for the shop with customer and employee details."}},
+    {"name": "Get Booking Stats", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/bookings/stats", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "bookings", "stats"]}, "description": "Get booking statistics: total, pending, completed, cancelled counts."}},
+    {"name": "Get Bookings by Status", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/bookings/status?status=pending", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "bookings", "status"], "query": [{"key": "status", "value": "pending", "description": "pending, confirmed, completed, cancelled"}]}, "description": "Get bookings filtered by status with full details."}},
+    {"name": "Update Booking Status", "request": {"method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/bookings/{{booking_id}}/status", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "bookings", "{{booking_id}}", "status"]}, "body": {"mode": "raw", "raw": "{\n  \"status\": \"completed\"\n}", "options": {"raw": {"language": "json"}}}, "description": "Update booking status. Allowed: confirmed, completed, cancelled."}},
+    {"name": "Delete Booking", "request": {"method": "DELETE", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/bookings/{{booking_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "bookings", "{{booking_id}}"]}, "description": "Delete booking (only after payment success). Releases employee time slot."}}
+  ]
+}

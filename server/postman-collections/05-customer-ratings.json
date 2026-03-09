@@ -1,0 +1,60 @@
+{
+  "info": {
+    "name": "EverCut - Customer Ratings",
+    "description": "Customer rating and review management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]},
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
+    {"key": "api_prefix", "value": "api/v1", "type": "string"},
+    {"key": "firebase_token", "value": "", "type": "string"},
+    {"key": "shop_id", "value": "", "type": "string"}
+  ],
+  "item": [
+    {
+      "name": "Add Rating",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/ratings",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "ratings"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"shopId\": \"{{shop_id}}\",\n  \"rating\": 5,\n  \"review\": \"Excellent service! Very professional and friendly staff.\"\n}",
+          "options": {"raw": {"language": "json"}}
+        },
+        "description": "Add or update rating for a shop.\n\nRequired Fields:\n- shopId: Shop ID\n- rating: 1-5 (integer)\n- review: Text review (optional, max 500 chars)\n\nBusiness Rules:\n- One rating per customer per shop\n- If rating exists, it will be updated\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Rating added\",\n  \"data\": {...}\n}"
+      }
+    },
+    {
+      "name": "Get Shop Ratings",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/shops/{{shop_id}}/ratings",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "shops", "{{shop_id}}", "ratings"]
+        },
+        "description": "Get all ratings for a shop with customer details and shop replies.\n\nResponse:\n{\n  \"success\": true,\n  \"data\": [\n    {\n      \"ratingId\": \"...\",\n      \"rating\": 5,\n      \"review\": \"Great service!\",\n      \"user\": {\n        \"firstName\": \"John\",\n        \"photoUrl\": \"...\"\n      },\n      \"reply\": {\n        \"text\": \"Thank you for your feedback!\",\n        \"repliedAt\": \"2024-03-15T10:30:00.000Z\"\n      },\n      \"createdAt\": \"2024-03-15T10:30:00.000Z\"\n    }\n  ]\n}"
+      }
+    },
+    {
+      "name": "Get Rating Summary",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/shops/{{shop_id}}/ratings/summary",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "shops", "{{shop_id}}", "ratings", "summary"]
+        },
+        "description": "Get rating summary with average, count, and distribution.\n\nResponse:\n{\n  \"success\": true,\n  \"data\": {\n    \"averageRating\": 4.5,\n    \"totalRatings\": 120,\n    \"distribution\": {\n      \"5\": 80,\n      \"4\": 30,\n      \"3\": 8,\n      \"2\": 2,\n      \"1\": 0\n    }\n  }\n}"
+      }
+    }
+  ]
+}

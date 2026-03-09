@@ -1,0 +1,21 @@
+{
+  "info": {
+    "name": "EverCut - Barber Services",
+    "description": "Service catalog management for barber shops",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]},
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
+    {"key": "api_prefix", "value": "api/v1", "type": "string"},
+    {"key": "firebase_token", "value": "", "type": "string"},
+    {"key": "service_id", "value": "", "type": "string"}
+  ],
+  "item": [
+    {"name": "Get All Services", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/services", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "services"]}, "description": "Get all services offered by the shop."}},
+    {"name": "Add Single Service", "event": [{"listen": "test", "script": {"exec": ["if (pm.response.code === 201) {", "    var jsonData = pm.response.json();", "    if (jsonData.data && jsonData.data._id) {", "        pm.collectionVariables.set('service_id', jsonData.data._id);", "    }", "}"], "type": "text/javascript"}}], "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/services", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "services"]}, "body": {"mode": "raw", "raw": "{\n  \"serviceName\": \"Haircut\",\n  \"serviceType\": \"single\",\n  \"serviceFor\": \"male\",\n  \"duration\": 30,\n  \"actualPrice\": 500,\n  \"offerPrice\": 400,\n  \"finalPrice\": 400,\n  \"imageUrl\": \"https://example.com/haircut.jpg\"\n}", "options": {"raw": {"language": "json"}}}, "description": "Add new single service."}},
+    {"name": "Add Bundled Service", "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/services", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "services"]}, "body": {"mode": "raw", "raw": "{\n  \"serviceName\": \"Premium Package\",\n  \"serviceType\": \"bundled\",\n  \"serviceFor\": \"male\",\n  \"bundledServices\": [\"Haircut\", \"Beard Trim\", \"Face Massage\"],\n  \"totalDuration\": 60,\n  \"totalPrice\": 800,\n  \"imageUrl\": \"https://example.com/package.jpg\"\n}", "options": {"raw": {"language": "json"}}}, "description": "Add new bundled service package."}},
+    {"name": "Update Service", "request": {"method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/services/{{service_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "services", "{{service_id}}"]}, "body": {"mode": "raw", "raw": "{\n  \"offerPrice\": 350,\n  \"finalPrice\": 350\n}", "options": {"raw": {"language": "json"}}}, "description": "Update service details. All fields are optional."}},
+    {"name": "Delete Service", "request": {"method": "DELETE", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/services/{{service_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "services", "{{service_id}}"]}, "description": "Delete service (soft delete)."}}
+  ]
+}

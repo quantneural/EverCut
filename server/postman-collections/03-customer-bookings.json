@@ -1,0 +1,203 @@
+{
+  "info": {
+    "name": "EverCut - Customer Bookings",
+    "description": "Customer booking management - create, view, cancel, reschedule bookings",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]
+  },
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
+    {"key": "api_prefix", "value": "api/v1", "type": "string"},
+    {"key": "firebase_token", "value": "", "type": "string"},
+    {"key": "booking_id", "value": "", "type": "string", "description": "Set after creating a booking"}
+  ],
+  "item": [
+    {
+      "name": "Get All Bookings",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/bookings?type=upcoming",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "bookings"],
+          "query": [{"key": "type", "value": "upcoming", "description": "upcoming, past, or favorites"}]
+        },
+        "description": "Get customer bookings filtered by type.\n\nQuery Parameters:\n- type: upcoming (future bookings), past (completed/cancelled), favorites\n\nResponse:\n{\n  \"success\": true,\n  \"data\": [\n    {\n      \"_id\": \"...\",\n      \"shopId\": {...},\n      \"employeeId\": {...},\n      \"serviceIds\": [...],\n      \"date\": \"2024-03-15\",\n      \"time\": \"14:30\",\n      \"totalAmount\": 500,\n      \"status\": \"confirmed\"\n    }\n  ]\n}"
+      }
+    },
+    {
+      "name": "Book Salon",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.data && jsonData.data.bookingId) {",
+              "        pm.collectionVariables.set('booking_id', jsonData.data.bookingId);",
+              "        console.log('Booking ID saved:', jsonData.data.bookingId);",
+              "    }",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/bookings",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "bookings"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"serviceId\": [\"service_id_1\", \"service_id_2\"],\n  \"employeeId\": \"employee_id\",\n  \"shopId\": \"shop_id\",\n  \"date\": \"2024-03-15\",\n  \"time\": \"14:30\",\n  \"amount\": 500\n}",
+          "options": {"raw": {"language": "json"}}
+        },
+        "description": "Create a new booking.\n\nRequired Fields:\n- serviceId: array of service IDs\n- employeeId: employee ID\n- shopId: shop ID\n- date: YYYY-MM-DD (must be future date)\n- time: HH:MM (must be within shop hours)\n- amount: total amount (optional, auto-calculated)\n\nBusiness Rules:\n- Cannot book in the past\n- Must be within shop hours\n- Employee must be available\n- Shop must be open\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Booking created successfully\",\n  \"data\": {\n    \"bookingId\": \"...\",\n    \"shopId\": \"...\",\n    \"employee\": {...},\n    \"services\": [...],\n    \"date\": \"2024-03-15\",\n    \"time\": \"14:30\",\n    \"totalAmount\": 500,\n    \"status\": \"confirmed\"\n  }\n}"
+      }
+    },
+    {
+      "name": "Get Booking Details",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/bookings/{{booking_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "bookings", "{{booking_id}}"]
+        },
+        "description": "Get detailed information about a specific booking.\n\nResponse:\n{\n  \"success\": true,\n  \"data\": {\n    \"bookingId\": \"...\",\n    \"customer\": {...},\n    \"employee\": {...},\n    \"shop\": {...},\n    \"services\": [...],\n    \"date\": \"2024-03-15\",\n    \"time\": \"14:30\",\n    \"totalAmount\": 500,\n    \"totalServices\": 2,\n    \"status\": \"confirmed\",\n    \"paymentStatus\": \"pending\"\n  }\n}"
+      }
+    },
+    {
+      "name": "Cancel Booking",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/bookings/{{booking_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "bookings", "{{booking_id}}"]
+        },
+        "description": "Cancel a booking.\n\nBusiness Rules:\n- Cannot cancel if already completed\n- Cannot cancel if already cancelled\n- Cannot cancel past appointments\n- Must cancel at least 2 hours before appointment\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Booking cancelled\",\n  \"data\": {...}\n}"
+      }
+    },
+    {
+      "name": "Reschedule Booking",
+      "request": {
+        "method": "PUT",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/bookings/{{booking_id}}/reschedule",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "bookings", "{{booking_id}}", "reschedule"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"newDate\": \"2024-03-20\",\n  \"newTime\": \"15:00\"\n}",
+          "options": {"raw": {"language": "json"}}
+        },
+        "description": "Reschedule a booking to a new date/time.\n\nRequired Fields:\n- newDate: YYYY-MM-DD\n- newTime: HH:MM\n\nBusiness Rules:\n- Maximum 1 reschedule per booking\n- Cannot reschedule past appointments\n- Must reschedule at least 2 hours before appointment\n- New slot must be available\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Booking rescheduled\",\n  \"data\": {...}\n}"
+      }
+    },
+    {
+      "name": "Reorder Booking",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/bookings/{{booking_id}}/reorder",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "bookings", "{{booking_id}}", "reorder"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"newDate\": \"2024-03-25\",\n  \"newTime\": \"16:00\"\n}",
+          "options": {"raw": {"language": "json"}}
+        },
+        "description": "Rebook the same services with a new date/time (creates a new booking).\n\nRequired Fields:\n- newDate: YYYY-MM-DD\n- newTime: HH:MM\n\nDifference from Reschedule:\n- Creates a NEW booking (original remains unchanged)\n- No limit on how many times you can reorder\n- Useful for repeat customers\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Booking reordered\",\n  \"data\": {\n    \"bookingId\": \"new_booking_id\",\n    \"employee\": {...},\n    \"services\": [...],\n    \"totalAmount\": 500\n  }\n}"
+      }
+    },
+    {
+      "name": "Toggle Favorite",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/bookings/{{booking_id}}/favorite",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "bookings", "{{booking_id}}", "favorite"]
+        },
+        "description": "Add or remove booking from favorites.\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Booking added to favorites\",\n  \"data\": {...}\n}"
+      }
+    },
+    {
+      "name": "Get Booking Confirmation",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/bookings/{{booking_id}}/confirmation",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "bookings", "{{booking_id}}", "confirmation"]
+        },
+        "description": "Get booking confirmation details (simplified view for confirmation screen).\n\nResponse:\n{\n  \"success\": true,\n  \"data\": {\n    \"shopCoverUrl\": \"https://...\",\n    \"date\": \"2024-03-15\",\n    \"time\": \"14:30\",\n    \"services\": [\"Haircut\", \"Beard Trim\"],\n    \"totalAmount\": 500,\n    \"totalServices\": 2\n  }\n}"
+      }
+    },
+    {
+      "name": "Update Booking",
+      "request": {
+        "method": "PUT",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/bookings/{{booking_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "bookings", "{{booking_id}}"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"employeeId\": \"new_employee_id\",\n  \"date\": \"2024-03-16\",\n  \"time\": \"15:00\"\n}",
+          "options": {"raw": {"language": "json"}}
+        },
+        "description": "Update booking details (employee, date, time).\n\nOptional Fields:\n- employeeId\n- date\n- time\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Booking updated\",\n  \"data\": {...}\n}"
+      }
+    },
+    {
+      "name": "Delete Service from Booking",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/bookings/{{booking_id}}/services/:serviceId",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "bookings", "{{booking_id}}", "services", ":serviceId"],
+          "variable": [{"key": "serviceId", "value": "service_id_to_remove"}]
+        },
+        "description": "Remove a specific service from a booking.\n\nNote: Total amount is recalculated automatically.\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Service removed\",\n  \"data\": {\n    \"remainingServices\": [...],\n    \"totalAmount\": 300\n  }\n}"
+      }
+    },
+    {
+      "name": "Get Employee Calendar",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}{{api_prefix}}/customer/employees/:employeeId/calendar?date=2024-03-15",
+          "host": ["{{base_url}}"],
+          "path": ["{{api_prefix}}", "customer", "employees", ":employeeId", "calendar"],
+          "query": [{"key": "date", "value": "2024-03-15", "description": "YYYY-MM-DD"}],
+          "variable": [{"key": "employeeId", "value": "employee_id"}]
+        },
+        "description": "Get employee availability calendar for a specific date.\n\nQuery Parameters:\n- date: YYYY-MM-DD (required)\n\nResponse:\n{\n  \"success\": true,\n  \"data\": {\n    \"employeeId\": \"...\",\n    \"name\": \"Jane Smith\",\n    \"workingHours\": {\"start\": \"09:00\", \"end\": \"18:00\"},\n    \"blockedDates\": [...],\n    \"bookedSlots\": [\n      {\"date\": \"2024-03-15\", \"time\": \"10:00\", \"bookingId\": \"...\"},\n      {\"date\": \"2024-03-15\", \"time\": \"14:00\", \"bookingId\": \"...\"}\n    ]\n  }\n}"
+      }
+    }
+  ]
+}

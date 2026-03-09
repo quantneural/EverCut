@@ -1,0 +1,154 @@
+import mongoose from 'mongoose';
+import { ALL_SHOP_CATEGORIES, DAYS_OF_WEEK } from '../utils/constants.js';
+
+/**
+ * Shop / Salon model — replaces the old BarberSetup.
+ *
+ * Key changes from old schema:
+ *   - `ownerId` (ObjectId → User) replaces `firebaseUid` (String)
+ *   - Renamed to "Shop" (domain-neutral term)
+ *   - Added soft-delete, proper indexes, and validation
+ */
+const shopSchema = new mongoose.Schema(
+    {
+        ownerId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true,
+            unique: true,
+            index: true,
+        },
+        shopName: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        ownerName: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        category: {
+            type: String,
+            enum: ALL_SHOP_CATEGORIES,
+            required: true,
+        },
+        phoneNumber: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        emailId: {
+            type: String,
+            required: true,
+            lowercase: true,
+            trim: true,
+        },
+        upiId: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        bio: {
+            type: String,
+            default: '',
+            maxlength: 500,
+        },
+        address: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        location: {
+            type: {
+                type: String,
+                enum: ['Point'],
+                required: true,
+            },
+            coordinates: {
+                type: [Number], // [longitude, latitude]
+                required: true,
+            },
+        },
+        numberOfEmployees: {
+            type: Number,
+            required: true,
+            min: 1,
+        },
+        yearsOfExperience: {
+            type: Number,
+            required: true,
+            min: 0,
+        },
+        facilities: [
+            {
+                type: String,
+                trim: true,
+            },
+        ],
+        availableDays: [
+            {
+                type: String,
+                enum: DAYS_OF_WEEK,
+            },
+        ],
+        openTime: {
+            type: String,
+            required: true,
+        },
+        closeTime: {
+            type: String,
+            required: true,
+        },
+        breakTimes: [
+            {
+                start: { type: String, required: true },
+                end: { type: String, required: true },
+                _id: false,
+            }
+        ],
+        coverUrl: {
+            type: String,
+            default: null,
+        },
+        coverCloudinaryId: {
+            type: String,
+            default: null,
+        },
+        pinHash: {
+            type: String,
+            required: true,
+        },
+        isOpen: {
+            type: Boolean,
+            default: true,
+        },
+        isVerified: {
+            type: Boolean,
+            default: false,
+        },
+        deletedAt: {
+            type: Date,
+            default: null,
+        },
+    },
+    { timestamps: true },
+);
+
+// ---------------------------------------------------------------------------
+// Indexes
+// ---------------------------------------------------------------------------
+shopSchema.index({ location: '2dsphere' });
+shopSchema.index({ category: 1, isOpen: 1 });
+
+// ---------------------------------------------------------------------------
+// Soft-delete query middleware
+// ---------------------------------------------------------------------------
+shopSchema.pre(/^find/, function () {
+    if (!this.getOptions()?.includeDeleted) {
+        this.where({ deletedAt: null });
+    }
+});
+
+const Shop = mongoose.model('Shop', shopSchema);
+export default Shop;
