@@ -1,5 +1,11 @@
 import mongoose from 'mongoose';
-import { ALL_SHOP_CATEGORIES, DAYS_OF_WEEK } from '../utils/constants.js';
+import {
+    ALL_GENDERS,
+    ALL_SERVICE_FOR,
+    ALL_SHOP_AMENITIES,
+    ALL_SHOP_CATEGORIES,
+    DAYS_OF_WEEK,
+} from '../utils/constants.js';
 
 /**
  * Shop / Salon model — replaces the old BarberSetup.
@@ -28,9 +34,33 @@ const shopSchema = new mongoose.Schema(
             required: true,
             trim: true,
         },
+        ownerFirstName: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        ownerLastName: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        ownerGender: {
+            type: String,
+            enum: ALL_GENDERS,
+            required: true,
+        },
+        ownerDateOfBirth: {
+            type: Date,
+            required: true,
+        },
         category: {
             type: String,
             enum: ALL_SHOP_CATEGORIES,
+            required: true,
+        },
+        targetCustomers: {
+            type: String,
+            enum: ALL_SERVICE_FOR,
             required: true,
         },
         phoneNumber: {
@@ -45,6 +75,16 @@ const shopSchema = new mongoose.Schema(
             trim: true,
         },
         upiId: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        accountHolderName: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        bankName: {
             type: String,
             required: true,
             trim: true,
@@ -74,15 +114,18 @@ const shopSchema = new mongoose.Schema(
             type: Number,
             required: true,
             min: 1,
+            default: 1,
         },
         yearsOfExperience: {
             type: Number,
             required: true,
             min: 0,
+            default: 0,
         },
         facilities: [
             {
                 type: String,
+                enum: ALL_SHOP_AMENITIES,
                 trim: true,
             },
         ],
@@ -105,7 +148,7 @@ const shopSchema = new mongoose.Schema(
                 start: { type: String, required: true },
                 end: { type: String, required: true },
                 _id: false,
-            }
+            },
         ],
         coverUrl: {
             type: String,
@@ -123,10 +166,6 @@ const shopSchema = new mongoose.Schema(
             type: Boolean,
             default: true,
         },
-        isVerified: {
-            type: Boolean,
-            default: false,
-        },
         deletedAt: {
             type: Date,
             default: null,
@@ -139,7 +178,7 @@ const shopSchema = new mongoose.Schema(
 // Indexes
 // ---------------------------------------------------------------------------
 shopSchema.index({ location: '2dsphere' });
-shopSchema.index({ category: 1, isOpen: 1 });
+shopSchema.index({ category: 1, targetCustomers: 1, isOpen: 1 });
 
 // ---------------------------------------------------------------------------
 // Soft-delete query middleware
