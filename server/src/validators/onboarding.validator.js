@@ -1,6 +1,37 @@
 import Joi from 'joi';
-import { ALL_GENDERS, ALL_SHOP_CATEGORIES, DAYS_OF_WEEK } from '../utils/constants.js';
+import {
+    ALL_GENDERS,
+    ALL_SERVICE_FOR,
+    ALL_SHOP_AMENITIES,
+    ALL_SHOP_CATEGORIES,
+    DAYS_OF_WEEK,
+    SECURITY_PIN_LENGTH,
+} from '../utils/constants.js';
 import { locationSchema } from './common.validator.js';
+
+const daysSchema = Joi.alternatives().try(
+    Joi.array().items(Joi.string().valid(...DAYS_OF_WEEK)),
+    Joi.string(),
+);
+
+const amenitiesSchema = Joi.alternatives().try(
+    Joi.array().items(Joi.string().valid(...ALL_SHOP_AMENITIES)),
+    Joi.string(),
+);
+
+const breakTimesSchema = Joi.alternatives().try(
+    Joi.array().items(
+        Joi.object({
+            start: Joi.string(),
+            end: Joi.string(),
+            startsAt: Joi.string(),
+            endsAt: Joi.string(),
+        }),
+    ),
+    Joi.string(),
+);
+
+const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR, 'men', 'women');
 
 export const customerOnboardingSchema = Joi.object({
     phoneNumber: Joi.string().required(),
@@ -14,24 +45,118 @@ export const customerOnboardingSchema = Joi.object({
 });
 
 export const barberOnboardingSchema = Joi.object({
-    phoneNumber: Joi.string().required(),
-    emailId: Joi.string().email().required(),
+    phoneNumber: Joi.string(),
+    email: Joi.string().email(),
+    emailId: Joi.string().email(),
+    firstName: Joi.string().trim().min(1).max(50).required(),
+    lastName: Joi.string().trim().min(1).max(50).required(),
+    gender: Joi.string().valid(...ALL_GENDERS).required(),
+    dateOfBirth: Joi.date().required(),
     shopName: Joi.string().trim().min(1).max(100).required(),
-    shopOwner: Joi.string().trim().min(1).max(100).required(),
-    shopCategory: Joi.string().valid(...ALL_SHOP_CATEGORIES).required(),
-    upiId: Joi.string().required(),
+    shopOwner: Joi.string().trim().min(1).max(100),
+    shopCategory: Joi.string().valid(...ALL_SHOP_CATEGORIES),
+    businessCategory: Joi.string().valid(...ALL_SHOP_CATEGORIES),
+    category: Joi.string().valid(...ALL_SHOP_CATEGORIES),
+    targetCustomers: targetCustomersSchema.required(),
+    upiId: Joi.string(),
+    upiAddress: Joi.string(),
+    accountHolderName: Joi.string().trim().min(1).max(100).required(),
+    bankName: Joi.string().trim().min(1).max(120).required(),
     bio: Joi.string().max(500).allow('').default(''),
-    address: Joi.string().trim().required(),
+    address: Joi.string().trim(),
+    shopLocation: Joi.string().trim(),
     location: Joi.alternatives().try(locationSchema, Joi.string()).required(),
-    numberOfEmployees: Joi.number().integer().min(1).required(),
-    yearsOfExperience: Joi.number().integer().min(0).required(),
-    facilities: Joi.array().items(Joi.string()).default([]),
-    availableDays: Joi.array().items(Joi.string().valid(...DAYS_OF_WEEK)).required(),
-    openTime: Joi.string().required(),
-    closeTime: Joi.string().required(),
-    breakTimes: Joi.array().items(
-        Joi.object({ start: Joi.string().required(), end: Joi.string().required() }),
-    ).default([]),
-    pin: Joi.string().pattern(/^\d{4,6}$/).required(),
-    confirmPin: Joi.string().required(),
-});
+    numberOfEmployees: Joi.number().integer().min(1).default(1),
+    yearsOfExperience: Joi.number().integer().min(0).default(0),
+    facilities: amenitiesSchema,
+    amenities: amenitiesSchema,
+    availableDays: daysSchema,
+    workingDays: daysSchema,
+    openTime: Joi.string(),
+    closeTime: Joi.string(),
+    opensAt: Joi.string(),
+    closesAt: Joi.string(),
+    workingHours: Joi.alternatives().try(
+        Joi.object({
+            openTime: Joi.string(),
+            closeTime: Joi.string(),
+            opensAt: Joi.string(),
+            closesAt: Joi.string(),
+        }),
+        Joi.string(),
+    ),
+    breakTimes: breakTimesSchema,
+    breakTimings: breakTimesSchema,
+    pin: Joi.string().pattern(new RegExp(`^\\d{${SECURITY_PIN_LENGTH}}$`)).required(),
+    confirmPin: Joi.string().required().valid(Joi.ref('pin')).messages({
+        'any.only': 'confirmPin must match pin',
+    }),
+})
+    .custom((value, helpers) => {
+        value.shopCategory = value.shopCategory || value.businessCategory || value.category;
+        value.emailId = value.emailId || value.email;
+        value.upiId = value.upiId || value.upiAddress;
+        value.address = value.address || value.shopLocation;
+        value.facilities = value.facilities ?? value.amenities ?? [];
+        value.availableDays = value.availableDays ?? value.workingDays;
+        value.breakTimes = value.breakTimes ?? value.breakTimings ?? [];
+
+        if (value.workingHours) {
+            if (typeof value.workingHours === 'string') {
+                try {
+                    value.workingHours = JSON.parse(value.workingHours);
+                } catch {
+                    return helpers.error('any.custom', {
+                        message: 'workingHours must be a valid JSON object',
+                    });
+                }
+            }
+            value.openTime = value.openTime
+                || value.opensAt
+                || value.workingHours.openTime
+                || value.workingHours.opensAt;
+            value.closeTime = value.closeTime
+                || value.closesAt
+                || value.workingHours.closeTime
+                || value.workingHours.closesAt;
+        } else {
+            value.openTime = value.openTime || value.opensAt;
+            value.closeTime = value.closeTime || value.closesAt;
+        }
+
+        if (!value.shopCategory) {
+            return helpers.error('any.custom', {
+                message: 'shopCategory/businessCategory is required',
+            });
+        }
+        if (!value.emailId) {
+            return helpers.error('any.custom', {
+                message: 'email or emailId is required',
+            });
+        }
+        if (!value.upiId) {
+            return helpers.error('any.custom', {
+                message: 'upiId or upiAddress is required',
+            });
+        }
+        if (!value.address) {
+            return helpers.error('any.custom', {
+                message: 'address or shopLocation is required',
+            });
+        }
+        if (!value.availableDays) {
+            return helpers.error('any.custom', {
+                message: 'availableDays or workingDays is required',
+            });
+        }
+        if (!value.openTime || !value.closeTime) {
+            return helpers.error('any.custom', {
+                message: 'openTime and closeTime are required',
+            });
+        }
+
+        return value;
+    })
+    .messages({
+        'any.custom': '{{#message}}',
+    });

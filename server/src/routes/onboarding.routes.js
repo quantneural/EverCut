@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import authenticate from '../middleware/authenticate.middleware.js';
-import { uploadCustomerPhoto } from '../middleware/upload.middleware.js';
+import {
+    uploadBarberOnboardingImages,
+    uploadCustomerPhoto,
+} from '../middleware/upload.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import {
     customerOnboardingSchema,
@@ -29,6 +32,7 @@ router.post(
 router.post(
     '/barbers',
     authenticate,
+    uploadBarberOnboardingImages,
     validate(barberOnboardingSchema, 'body'),
     onboardingController.createBarberOnboarding,
 );

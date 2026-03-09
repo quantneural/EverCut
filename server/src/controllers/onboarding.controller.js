@@ -17,7 +17,7 @@ export const createCustomerOnboarding = async (req, res, next) => {
 export const createBarberOnboarding = async (req, res, next) => {
     try {
         const { firebaseUid } = req.user;
-        const result = await onboardingService.createBarberOnboarding(firebaseUid, req.body);
+        const result = await onboardingService.createBarberOnboarding(firebaseUid, req.user, req.body, req.files);
         return res.status(201).json(ApiResponse.success(result, 'Barber profile created'));
     } catch (err) {
         next(err);
