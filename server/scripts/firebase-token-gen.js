@@ -39,6 +39,7 @@ const PATHS = {
   serviceAccount: resolve(ROOT, 'firebase-admin-sdk.json'),
   env:            resolve(ROOT, '.env'),
   output:         resolve(__dirname, 'test-tokens.txt'),
+  outputJson:     resolve(__dirname, 'test-tokens.json'),
 };
 
 // ─── Test user definitions ────────────────────────────────────────────────────
@@ -237,9 +238,23 @@ async function main() {
 
   writeFileSync(PATHS.output, lines.join('\n'));
 
+  // ── Save tokens to JSON (consumed by verify-token.js) ──
+  const jsonOutput = {
+    generatedAt: new Date().toISOString(),
+    expiresAt,
+    tokens: Object.fromEntries(
+      Object.entries(results).map(([uid, data]) => [
+        uid,
+        { role: data.role, idToken: data.idToken ?? null },
+      ]),
+    ),
+  };
+  writeFileSync(PATHS.outputJson, JSON.stringify(jsonOutput, null, 2));
+
   // ── Final summary ──
   banner('Done');
-  log(`Tokens saved → ${PATHS.output}\n`);
+  log(`Tokens saved → ${PATHS.output}`);
+  log(`Tokens saved → ${PATHS.outputJson}\n`);
 
   if (apiKey) {
     log(`Tokens expire at: ${expiresAt}`);
