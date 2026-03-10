@@ -5,19 +5,19 @@ import { fileURLToPath } from 'url';
 // Load .env from project root (one level above src/)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env'), quiet: true });
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 /**
- * Read an env var – throw immediately if it is required and missing.
+ * Read an env var and throw immediately if it is required and missing.
  */
 const requireEnv = (key) => {
   const value = process.env[key];
   if (!value) {
-    throw new Error(`❌ Missing required environment variable: ${key}`);
+    throw new Error(`Missing required environment variable: ${key}`);
   }
   return value;
 };
@@ -44,10 +44,9 @@ const config = Object.freeze({
 
   /** Firebase */
   firebase: Object.freeze({
-    serviceAccountPath: optionalEnv(
-      'FIREBASE_SERVICE_ACCOUNT_KEY_PATH',
-      './firebase-admin-sdk.json',
-    ),
+    projectId: requireEnv('FIREBASE_PROJECT_ID'),
+    clientEmail: requireEnv('FIREBASE_CLIENT_EMAIL'),
+    privateKey: requireEnv('FIREBASE_PRIVATE_KEY').replace(/\\n/g, '\n'),
   }),
 
   /** Cloudinary */
