@@ -5,7 +5,7 @@ export const uploadPhotos = async (req, res, next) => {
     try {
         const { photoType, description } = req.body;
         const photos = await photoService.uploadPhotos(req.user._id, req.files, photoType, description);
-        return res.status(201).json(ApiResponse.success(photos, `${photos.length} photo(s) uploaded`));
+        return res.status(201).json(ApiResponse.success(photos, `${photos.length} photo(s) uploaded`, 201));
     } catch (err) {
         next(err);
     }

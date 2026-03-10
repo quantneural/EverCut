@@ -1,8 +1,19 @@
 import Photo from '../models/photo.model.js';
 
 class PhotoRepository {
-    async create(data) {
+    async create(data, options = {}) {
+        if (options.session) {
+            const [photo] = await Photo.create([data], { session: options.session });
+            return photo;
+        }
         return Photo.create(data);
+    }
+
+    async createMany(data, options = {}) {
+        return Photo.insertMany(data, {
+            ordered: true,
+            session: options.session,
+        });
     }
 
     async findByShopId(shopId, query = {}) {
@@ -14,8 +25,12 @@ class PhotoRepository {
         return Photo.findOne({ _id: id, shopId, isActive: true });
     }
 
-    async deleteByIdAndShop(id, shopId) {
-        return Photo.findOneAndDelete({ _id: id, shopId, isActive: true });
+    async softDeleteByIdAndShop(id, shopId, options = {}) {
+        return Photo.findOneAndUpdate(
+            { _id: id, shopId, isActive: true },
+            { $set: { isActive: false, deletedAt: new Date() } },
+            { new: true, session: options.session },
+        );
     }
 
     async getActiveCountByShop(shopId) {

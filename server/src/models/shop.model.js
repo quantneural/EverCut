@@ -158,6 +158,11 @@ const shopSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
+        galleryPhotoCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
         pinHash: {
             type: String,
             required: true,

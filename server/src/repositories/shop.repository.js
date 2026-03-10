@@ -1,5 +1,8 @@
 import Shop from '../models/shop.model.js';
-import { NEARBY_DISTANCE_METERS } from '../utils/constants.js';
+import {
+    MAX_PHOTOS_PER_SHOP,
+    NEARBY_DISTANCE_METERS,
+} from '../utils/constants.js';
 
 class ShopRepository {
     async create(data) {
@@ -14,16 +17,42 @@ class ShopRepository {
         return Shop.findOne({ ownerId });
     }
 
-    async updateByOwnerId(ownerId, data) {
+    async updateByOwnerId(ownerId, data, options = {}) {
         return Shop.findOneAndUpdate(
             { ownerId },
             { $set: data },
-            { new: true, runValidators: true },
+            { new: true, runValidators: true, session: options.session },
         );
     }
 
-    async updateById(id, data) {
-        return Shop.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: true });
+    async updateById(id, data, options = {}) {
+        return Shop.findByIdAndUpdate(
+            id,
+            { $set: data },
+            { new: true, runValidators: true, session: options.session },
+        );
+    }
+
+    async incrementGalleryPhotoCount(shopId, delta, options = {}) {
+        const filter = { _id: shopId };
+
+        if (delta >= 0) {
+            filter.$or = [
+                { galleryPhotoCount: { $exists: false } },
+                { galleryPhotoCount: { $lte: Math.max(0, MAX_PHOTOS_PER_SHOP - delta) } },
+            ];
+        } else {
+            filter.galleryPhotoCount = { $gte: Math.abs(delta) };
+        }
+
+        return Shop.findOneAndUpdate(
+            filter,
+            { $inc: { galleryPhotoCount: delta } },
+            {
+                new: true,
+                session: options.session,
+            },
+        );
     }
 
     async findNearby(coordinates, maxDistance = NEARBY_DISTANCE_METERS, selectFields) {
