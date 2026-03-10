@@ -13,7 +13,7 @@ const initFirebase = () => {
 
   try {
     admin.initializeApp({
-      credential: admin.credential.cert(config.firebase),
+      credential: admin.credential.cert({ ...config.firebase }),
     });
 
     logger.info('Firebase Admin SDK initialised', {
