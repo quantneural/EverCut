@@ -14,7 +14,7 @@ This folder contains **13 modular Postman collections** organized by feature/mod
 | 04 | **Customer Bookings** | 11 | Book, cancel, reschedule, reorder, favorites, employee calendar |
 | 05 | **Customer Shop Discovery** | 5 | Nearby shops, doorstep services, search |
 | 06 | **Customer Ratings** | 3 | Add ratings, view ratings with replies, rating summary |
-| 07 | **Barber Profile & Shop** | 5 | Shop profile, business info, PIN, cover, status |
+| 07 | **Barber Profile & Shop** | 10 | Shop profile, owner picture, onboarding-shaped profile updates, dedicated UPI details, PIN, cover, status, session revocation, account deletion |
 | 08 | **Barber Employees** | 4 | Employee CRUD operations |
 | 09 | **Barber Services** | 5 | Service catalog management (single/bundled) |
 | 10 | **Barber Bookings** | 5 | Booking management, stats, status updates |
@@ -22,7 +22,7 @@ This folder contains **13 modular Postman collections** organized by feature/mod
 | 12 | **Barber Earnings** | 1 | Earnings tracking and summary |
 | 13 | **Barber Ratings** | 5 | Barber-side rating moderation, replies, and rating removal |
 
-**Total: 57 endpoints** across 13 collections
+**Total: 62 endpoints** across 13 collections
 
 ---
 
@@ -178,7 +178,7 @@ firebase.auth().signInWithPhoneNumber(phoneNumber)
 02-Onboarding
   ↓ Complete Barber Profile (multipart + 3 shop images)
 07-Barber Profile & Shop
-  ↓ Get Profile → Update Business Info → Update Cover Image
+  ↓ Get Profile → Update Profile Picture / Update Business Info / Get/Update UPI Details / Change PIN / Update Cover Image / Sign-Out Everywhere / Delete Account
 08-Barber Employees
   ↓ Add Employee (repeat for multiple employees)
 09-Barber Services
@@ -441,6 +441,12 @@ All API responses follow this standard format:
 - Re-run `node scripts/firebase-token-gen.js` to generate fresh tokens
 - Copy the new token to Postman
 
+#### Issue: "This account has been deleted"
+**Solution:**
+- Deleted barber accounts are soft-deleted in MongoDB and blocked from future login
+- You must use a different active test user or create a new Firebase test account
+- Do not expect deleted accounts to re-onboard with the same token
+
 #### Issue: "Access denied. Required role(s): CUSTOMER"
 **Solution:** 
 - You're using a barber token on a customer endpoint or vice versa
@@ -544,11 +550,11 @@ All API responses follow this standard format:
 
 ```
 Total Collections: 13
-Total Endpoints: 57
+Total Endpoints: 62
 Authentication: 2 endpoints
 Onboarding: 2 endpoints
 Customer Features: 23 endpoints
-Barber Features: 30 endpoints
+Barber Features: 35 endpoints
 
 File Size: ~65KB total
 Format: Postman Collection v2.1.0
@@ -598,11 +604,15 @@ For API issues or questions:
 
 ### Barber Features
 - [ ] Shop profile management
-- [ ] Business info updates
+- [ ] Owner profile picture upload/update
+- [ ] Business info updates using the onboarding field aliases (`shopOwner`, `businessCategory`, `amenities`, `workingDays`, `workingHours`, `breakTimings`, `upiAddress`)
+- [ ] Dedicated UPI details read/update flow with verification status
 - [ ] PIN management (4 digits)
 - [ ] Cover image upload
 - [ ] Shop status toggle (open/close)
-- [ ] Employee CRUD operations
+- [ ] Sign out everywhere
+- [ ] PIN-protected barber account deletion (soft-deletes the account profile and blocks future login)
+- [ ] Employee CRUD operations, including optional employee photo replacement on update
 - [ ] Service catalog management (single/bundled)
 - [ ] Photo gallery management (multiple files)
 - [ ] Booking management and stats

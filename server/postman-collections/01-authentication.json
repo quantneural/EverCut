@@ -62,7 +62,7 @@
             }
           }
         },
-        "description": "Create auth session context after Firebase token verification. Returns profile if user already exists, or indicates the user must complete onboarding.\n\nRequest Body:\n- Optional: roleType ('CUSTOMER' or 'BARBER'), deprecated and ignored by backend.\n\nResponse (New User):\n{\n  \"success\": true,\n  \"message\": \"New user. Please complete your profile.\",\n  \"data\": {\n    \"isNewUser\": true,\n    \"firebaseUid\": \"abc123\",\n    \"phoneNumber\": \"+1234567890\"\n  }\n}\n\nResponse (Existing User):\n{\n  \"success\": true,\n  \"message\": \"Login successful\",\n  \"data\": {\n    \"isNewUser\": false,\n    \"user\": {...},\n    \"profile\": {...}\n  }\n}"
+        "description": "Create auth session context after Firebase token verification. Returns profile if the user already exists, or indicates the user must complete onboarding.\n\nRequest Body:\n- Optional: roleType ('CUSTOMER' or 'BARBER'), deprecated and ignored by backend.\n\nResponse (New User):\n{\n  \"success\": true,\n  \"message\": \"New user. Please complete your profile.\",\n  \"data\": {\n    \"isNewUser\": true,\n    \"firebaseUid\": \"abc123\",\n    \"phoneNumber\": \"+1234567890\",\n    \"email\": \"barber@example.com\"\n  }\n}\n\nResponse (Existing Barber User):\n{\n  \"success\": true,\n  \"message\": \"Login successful\",\n  \"data\": {\n    \"isNewUser\": false,\n    \"user\": {...},\n    \"profile\": {\n      \"shopName\": \"Downtown Cuts\",\n      \"shopOwner\": \"John Doe\",\n      \"businessCategory\": \"Barber\",\n      \"shopLocation\": \"MG Road, Bengaluru\",\n      \"amenities\": [...],\n      \"workingDays\": [...],\n      \"workingHours\": {\n        \"opensAt\": \"09:00\",\n        \"closesAt\": \"20:00\"\n      },\n      \"breakTimings\": [...],\n      \"shopImages\": [\"https://...\"]\n    }\n  }\n}\n\nDeleted/disabled accounts:\n- Return `401 Unauthorized`\n- Cannot create a new session or re-onboard with the same deleted account token"
       }
     },
     {
@@ -85,4 +85,3 @@
     }
   ]
 }
-

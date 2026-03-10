@@ -167,6 +167,12 @@
               "description": "Business profile step"
             },
             {
+              "key": "shopOwner",
+              "value": "John Doe",
+              "type": "text",
+              "description": "Optional alias for the owner/business name shown in the shop profile"
+            },
+            {
               "key": "businessCategory",
               "value": "Barber",
               "type": "text"
@@ -257,7 +263,7 @@
             }
           ]
         },
-        "description": "Complete barber/shop registration using multipart/form-data.\n\nRequired groups:\n- Personal: firstName, lastName, email/emailId, phoneNumber, dateOfBirth, gender\n- Business: shopName, businessCategory/shopCategory, targetCustomers, shopLocation/address, location\n- Availability: workingDays/availableDays, workingHours (or openTime + closeTime)\n- Payout: accountHolderName, bankName, upiAddress/upiId\n- Security: pin + confirmPin (exactly 4 digits)\n- Images: exactly 3 files in `shopImages`\n\nResponse data includes created user, shop, and initial photos."
+        "description": "Complete barber/shop registration using multipart/form-data.\n\nRequired groups:\n- Personal: firstName, lastName, email/emailId, phoneNumber, dateOfBirth, gender\n- Business: shopName, optional shopOwner/ownerName, businessCategory/shopCategory, targetCustomers, shopLocation/address, location\n- Availability: workingDays/availableDays, workingHours (or openTime + closeTime)\n- Payout: accountHolderName, bankName, upiAddress/upiId\n- Security: pin + confirmPin (exactly 4 digits)\n- Images: exactly 3 files in `shopImages`\n\nResponse data includes created user, the barber shop profile in onboarding-friendly shape, and the initial photo documents."
       }
     }
   ]
