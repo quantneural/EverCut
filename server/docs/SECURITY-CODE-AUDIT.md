@@ -53,9 +53,9 @@ However, the audit uncovered **several security vulnerabilities and bugs** that 
 
 | Severity | Count |
 |---|---|
-| 🔴 **Critical** | 5 |
-| 🟠 **High** | 6 |
-| 🟡 **Medium** | 10 |
+| 🔴 **Critical** | 4 |
+| 🟠 **High** | 3 |
+| 🟡 **Medium** | 6 |
 | 🔵 **Low** | 8 |
 
 ---
@@ -203,96 +203,9 @@ async create(data, options = {}) {
 
 ---
 
-### 3.5 🔴 CRITICAL — `firebase-admin-sdk.json` File Present in Server Root
-
-**File:** `server/firebase-admin-sdk.json` (2,376 bytes)
-
-**Description:**  
-A Firebase Admin SDK service-account JSON file exists in the project root. While it is listed in `.gitignore` and is **not** currently tracked by Git, its mere presence is a risk:
-
-1. The `.gitignore` could be accidentally modified, causing it to be committed.
-2. It may be included in Docker images, deployment artifacts, or backup archives.
-3. The configuration has moved to environment variables (`config/firebase.config.js`), so this file is **no longer needed**.
-
-**Risk:** Credential leak — a Firebase service-account key grants full administrative access to your Firebase project.
-
-**Remediation:**
-1. **Delete** `firebase-admin-sdk.json` from the server directory.
-2. Verify it was never committed: `git log --all --full-history -- firebase-admin-sdk.json`
-3. If it was ever committed, rotate the credentials in Firebase Console immediately.
-
----
-
 ## 4. High-Severity Issues
 
-### 4.1 🟠 HIGH — No Rate Limiting Implemented Despite Configuration Existing
-
-**Files:**
-- `src/config/index.js` — Lines 73–78 (rate limit config defined)
-- `src/app.js` (rate limiter never applied)
-
-**Description:**  
-The config defines `security.rateLimitWindowMs` (15 min) and `security.rateLimitMax` (100 requests), but **no rate-limiting middleware** is applied in `app.js` or any route file. The `express-rate-limit` package is also not installed.
-
-**Risk:** The API is vulnerable to **brute-force attacks**, credential stuffing, and abuse. An attacker can make unlimited requests to any endpoint.
-
-**Remediation:**
-```bash
-npm install express-rate-limit
-```
-```javascript
-// In app.js
-import rateLimit from 'express-rate-limit';
-const limiter = rateLimit({
-    windowMs: config.security.rateLimitWindowMs,
-    max: config.security.rateLimitMax,
-    standardHeaders: true,
-    legacyHeaders: false,
-});
-app.use(limiter);
-```
-
----
-
-### 4.2 🟠 HIGH — Missing `helmet` Security Headers
-
-**File:** `src/app.js`
-
-**Description:**  
-No HTTP security headers are set. The `helmet` package (or manual header configuration) is not used.
-
-**Risk:** The API is missing critical headers: `X-Content-Type-Options`, `Strict-Transport-Security`, `X-Frame-Options`, `X-XSS-Protection`, etc.
-
-**Remediation:**
-```bash
-npm install helmet
-```
-```javascript
-import helmet from 'helmet';
-app.use(helmet());
-```
-
----
-
-### 4.3 🟠 HIGH — Empty Auth Validator Schema Provides No Validation
-
-**File:** `src/validators/auth.validator.js`
-
-```javascript
-export const sessionSchema = Joi.object({});
-```
-
-**Description:**  
-The `sessionSchema` is an empty Joi object. Because the validate middleware uses `stripUnknown: true`, this means **any body content is silently stripped**. Any malicious or unexpected fields are removed, but no actual validation occurs even if the endpoint were to require specific body fields.
-
-Combined with `allowUnknown: false`, this effectively rejects any body with properties — making the body validation meaningless. The `/auth/session` endpoint sends `authenticate` middleware before this, and the controller only uses `req.user` (set by the middleware), so the body is never consumed. This is a dead validator.
-
-**Remediation:**
-Either remove the `validate(sessionSchema, 'body')` call from the route (since the endpoint doesn't use the body), or define meaningful validation if a body is expected.
-
----
-
-### 4.4 🟠 HIGH — `updateBooking` Doesn't Release Old Slot When Same Employee Changes Time
+### 4.1 🟠 HIGH — `updateBooking` Doesn't Release Old Slot When Same Employee Changes Time
 
 **File:** `src/services/booking.service.js` — Lines 262–280
 
@@ -323,7 +236,7 @@ const employee = await employeeRepository.claimSlot(employeeId, date, time);
 
 ---
 
-### 4.5 🟠 HIGH — Booking Deletion Doesn't Verify Shop Ownership
+### 4.2 🟠 HIGH — Booking Deletion Doesn't Verify Shop Ownership
 
 **File:** `src/services/booking.service.js` — Lines 356–364
 
@@ -334,7 +247,7 @@ const employee = await employeeRepository.claimSlot(employeeId, date, time);
 
 ---
 
-### 4.6 🟠 HIGH — `addToFavorites` Always Adds, Never Toggles
+### 4.3 🟠 HIGH — `addToFavorites` Always Adds, Never Toggles
 
 **File:** `src/services/booking.service.js` — Lines 237–239
 
@@ -395,32 +308,7 @@ The earnings aggregation calculates `todayEarning` and `lastMonthEarning` based 
 
 ---
 
-### 5.3 🟡 MEDIUM — Upload Middleware Runs Before Validation
-
-**Files:**
-- `src/routes/barber.routes.js` — Line 55
-- `src/routes/onboarding.routes.js` — Lines 20–26, 32–38
-- `src/routes/customer.routes.js` — Line 41
-
-**Description:**  
-In routes that have both upload and validation middleware, the upload (Multer) middleware runs **before** Joi body validation:
-
-```javascript
-// barber.routes.js:55
-router.post('/employees', uploadEmployeePhoto, validate(addEmployeeSchema, 'body'), ...);
-```
-
-This means files are uploaded to Cloudinary and consumed before the body is validated. If validation fails, the uploaded files **remain in Cloudinary** as orphans.
-
-**Risk:** Storage leak — an attacker could upload files repeatedly with invalid body data, filling up Cloudinary storage.
-
-**Remediation:** Either:
-1. Move validation before upload where possible (body fields may not be available in `multipart/form-data` until Multer processes the request).
-2. Add cleanup logic in the validation middleware or controller to delete uploaded files when validation fails.
-
----
-
-### 5.4 🟡 MEDIUM — No Pagination on List Endpoints
+### 5.3 🟡 MEDIUM — No Pagination on List Endpoints
 
 **Files:**
 - `src/services/booking.service.js` — `getBookingsByShop`, `getCustomerBookings`, `getBookingsByStatusDetailed`
@@ -438,7 +326,7 @@ A `buildPagination` utility exists in `src/utils/pagination.utils.js` but is **n
 
 ---
 
-### 5.5 🟡 MEDIUM — `Booking.customerId` References `User` but `populate` Uses `CustomerProfile` Fields
+### 5.4 🟡 MEDIUM — `Booking.customerId` References `User` but `populate` Uses `CustomerProfile` Fields
 
 **Files:**
 - `src/models/booking.model.js` — Line 23: `ref: 'User'`
@@ -456,20 +344,20 @@ The `Booking` model's `customerId` references the `User` model, but the `User` m
 
 ---
 
-### 5.6 🟡 MEDIUM — `Rating.customerId` References `User` but Populates Customer-Specific Fields
+### 5.5 🟡 MEDIUM — `Rating.customerId` References `User` but Populates Customer-Specific Fields
 
 **File:**
 - `src/models/rating.model.js` — Line 14: `ref: 'User'`
 - `src/repositories/rating.repository.js` — Lines 14, 52, 63, 71: `.populate('customerId', 'firstName lastName email')`
 
 **Description:**  
-Same issue as 5.5 — the `Rating` model's `customerId` references `User`, but populates try to select `firstName lastName email`. `User` has `email` but **not** `firstName`/`lastName`.
+Same issue as 5.4 — the `Rating` model's `customerId` references `User`, but populates try to select `firstName lastName email`. `User` has `email` but **not** `firstName`/`lastName`.
 
 **Risk:** Rating displays will show "Unknown" for customer names (the service has a fallback), but it masks a broken data relationship.
 
 ---
 
-### 5.7 🟡 MEDIUM — Inconsistent `isActive` Filtering in Soft-Delete
+### 5.6 🟡 MEDIUM — Inconsistent `isActive` Filtering in Soft-Delete
 
 **Files:**
 - `src/models/employee.model.js` — Lines 82–86
@@ -481,61 +369,6 @@ Employee soft-delete middleware filters by `deletedAt: null`, and `findByShopId`
 **Risk:** If an employee is fired and later rehired, the system may reject the addition due to a "ghost" duplicate.
 
 **Remediation:** Add `isActive: true` to the `findByShopIdAndPhone` query, or rely solely on the `deletedAt` middleware (remove redundant `isActive` filters).
-
----
-
-### 5.8 🟡 MEDIUM — `10mb` JSON Body Limit May Be Excessive
-
-**File:** `src/app.js` — Lines 38–39
-
-```javascript
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-```
-
-**Description:**  
-A 10 MB JSON body limit is very large for an API. File uploads go through Multer (separate limit), so no JSON endpoint should need 10 MB.
-
-**Risk:** Memory exhaustion — an attacker can send many 10 MB JSON payloads concurrently, consuming server memory.
-
-**Remediation:** Reduce to `'500kb'` or `'1mb'` — sufficient for even complex booking/shop-update payloads.
-
----
-
-### 5.9 🟡 MEDIUM — CORS Wildcard in Development
-
-**File:** `src/app.js` — Lines 29–31
-
-```javascript
-origin: config.env === 'production'
-    ? process.env.ALLOWED_ORIGINS?.split(',') || []
-    : '*',
-```
-
-**Description:**  
-In development, CORS allows all origins (`*`). If `NODE_ENV` is forgotten in production deployment, the API will accept requests from any origin. Additionally, the production fallback to `[]` (empty array) would **block all cross-origin requests**, which may silently break the frontend.
-
-**Remediation:** 
-1. Log a warning if `NODE_ENV !== 'production'` and CORS is wildcard.
-2. In production, throw/fail-fast if `ALLOWED_ORIGINS` is not set rather than defaulting to `[]`.
-
----
-
-### 5.10 🟡 MEDIUM — Missing `express-mongo-sanitize` or Equivalent
-
-**File:** `src/app.js`
-
-**Description:**  
-While Mongoose's `sanitizeFilter` is enabled in `database.config.js` (good!), the application doesn't use `express-mongo-sanitize` at the middleware level. The Mongoose sanitization is a safety net, but having defense-in-depth at the Express layer would catch injection attempts early (and log them).
-
-**Remediation:**
-```bash
-npm install express-mongo-sanitize
-```
-```javascript
-import mongoSanitize from 'express-mongo-sanitize';
-app.use(mongoSanitize());
-```
 
 ---
 
@@ -699,18 +532,14 @@ The pagination utility function exists but is never imported or called. This rep
 | 3.2 | Add ownership checks to all customer booking operations | 3 hours |
 | 3.3 | Add ownership checks to barber booking operations | 2 hours |
 | 3.4 | Fix Mongoose transaction — pass `session` to all operations | 2 hours |
-| 3.5 | Delete `firebase-admin-sdk.json` and verify history | 15 minutes |
 
 ### Phase 2 — High-Priority Fixes (Within 1 week)
 
 | # | Issue | Effort |
 |---|---|---|
-| 4.1 | Install and configure `express-rate-limit` | 1 hour |
-| 4.2 | Install and configure `helmet` | 30 minutes |
-| 4.3 | Remove or fix empty auth validator | 15 minutes |
-| 4.4 | Fix `updateBooking` slot release logic | 1 hour |
-| 4.5 | Add ownership verification to `deleteBookingAfterPayment` | 1 hour |
-| 4.6 | Implement proper favorite toggle logic | 1 hour |
+| 4.1 | Fix `updateBooking` slot release logic | 1 hour |
+| 4.2 | Add ownership verification to `deleteBookingAfterPayment` | 1 hour |
+| 4.3 | Implement proper favorite toggle logic | 1 hour |
 
 ### Phase 3 — Medium-Priority Improvements (Within 2–4 weeks)
 
@@ -718,13 +547,9 @@ The pagination utility function exists but is never imported or called. This rep
 |---|---|---|
 | 5.1 | Move direct model queries into repositories | 1 hour |
 | 5.2 | Fix earnings aggregation to use booking `date` | 1 hour |
-| 5.3 | Add cleanup logic for failed validation after upload | 3 hours |
-| 5.4 | Implement pagination across all list endpoints | 4 hours |
-| 5.5, 5.6 | Fix booking/rating `customerId` population | 3 hours |
-| 5.7 | Fix soft-delete inconsistency in employee duplicate check | 30 minutes |
-| 5.8 | Reduce JSON body limit | 15 minutes |
-| 5.9 | Improve CORS production config | 30 minutes |
-| 5.10 | Install `express-mongo-sanitize` | 30 minutes |
+| 5.3 | Implement pagination across all list endpoints | 4 hours |
+| 5.4, 5.5 | Fix booking/rating `customerId` population | 3 hours |
+| 5.6 | Fix soft-delete inconsistency in employee duplicate check | 30 minutes |
 
 ### Phase 4 — Low-Priority Cleanup (Ongoing)
 
@@ -742,10 +567,10 @@ The pagination utility function exists but is never imported or called. This rep
 | File | Lines | Layer | Key Issues |
 |---|---|---|---|
 | `src/routes/index.js` | 24 | Routes | — |
-| `src/routes/auth.routes.js` | 16 | Routes | Empty validator (4.3) |
-| `src/routes/barber.routes.js` | 90 | Routes | Upload before validate (5.3) |
-| `src/routes/customer.routes.js` | 77 | Routes | Upload before validate (5.3) |
-| `src/routes/onboarding.routes.js` | 41 | Routes | Upload before validate (5.3) |
+| `src/routes/auth.routes.js` | 16 | Routes | — |
+| `src/routes/barber.routes.js` | 90 | Routes | — |
+| `src/routes/customer.routes.js` | 77 | Routes | — |
+| `src/routes/onboarding.routes.js` | 41 | Routes | — |
 | `src/middleware/authenticate.middleware.js` | 63 | Middleware | ✅ Well-implemented |
 | `src/middleware/authorize.middleware.js` | 32 | Middleware | ✅ Well-implemented |
 | `src/middleware/error-handler.middleware.js` | 85 | Middleware | ✅ Well-implemented |
@@ -758,7 +583,7 @@ The pagination utility function exists but is never imported or called. This rep
 | `src/controllers/barber/barber-profile.controller.js` | 47 | Controller | Direct repo import |
 | `src/controllers/customer/customer-booking.controller.js` | 105 | Controller | IDOR (3.2) |
 | `src/services/auth.service.js` | 37 | Service | — |
-| `src/services/booking.service.js` | 387 | Service | **Most issues** (3.2–3.4, 4.4–4.6) |
+| `src/services/booking.service.js` | 387 | Service | **Most issues** (3.2–3.4, 4.1–4.3) |
 | `src/services/onboarding.service.js` | 342 | Service | Duplicated normalization (6.2) |
 | `src/services/shop.service.js` | 393 | Service | ReDoS (3.1), duplicated normalization |
 | `src/services/service-catalog.service.js` | 94 | Service | ReDoS (3.1), bypasses repo (5.1) |
@@ -768,9 +593,9 @@ The pagination utility function exists but is never imported or called. This rep
 | `src/services/earnings.service.js` | 46 | Service | Aggregation logic (5.2) |
 | `src/services/pin.service.js` | 72 | Service | ✅ Well-implemented |
 | `src/services/user.service.js` | 64 | Service | — |
-| `src/repositories/booking.repository.js` | 157 | Repository | Bad populate refs (5.5) |
-| `src/repositories/employee.repository.js` | 76 | Repository | Soft-delete inconsistency (5.7) |
-| `src/repositories/rating.repository.js` | 76 | Repository | Bad populate refs (5.6) |
+| `src/repositories/booking.repository.js` | 157 | Repository | Bad populate refs (5.4) |
+| `src/repositories/employee.repository.js` | 76 | Repository | Soft-delete inconsistency (5.6) |
+| `src/repositories/rating.repository.js` | 76 | Repository | Bad populate refs (5.5) |
 | `src/repositories/service.repository.js` | 71 | Repository | ReDoS (3.1) |
 | `src/models/booking.model.js` | 89 | Model | ✅ Well-indexed |
 | `src/models/user.model.js` | 70 | Model | ✅ Well-implemented |
@@ -782,11 +607,11 @@ The pagination utility function exists but is never imported or called. This rep
 | `src/utils/logger.js` | 142 | Utils | ✅ Good redaction |
 | `src/utils/time.utils.js` | 115 | Utils | ✅ Clean implementation |
 | `src/utils/pagination.utils.js` | 32 | Utils | Never used (6.8) |
-| `src/config/index.js` | 89 | Config | Rate limit unused (4.1) |
+| `src/config/index.js` | 89 | Config | — |
 | `src/config/database.config.js` | 64 | Config | ✅ Good security |
 | `src/config/firebase.config.js` | 31 | Config | ✅ Singleton pattern |
 | `src/config/cloudinary.config.js` | 11 | Config | — |
-| `src/validators/auth.validator.js` | 4 | Validator | Empty schema (4.3) |
+| `src/validators/auth.validator.js` | 4 | Validator | — |
 | `src/validators/booking.validator.js` | 56 | Validator | ✅ Comprehensive |
 | `src/validators/onboarding.validator.js` | 163 | Validator | Duplicated logic (6.2) |
 | `src/validators/shop.validator.js` | 205 | Validator | ✅ Thorough |
