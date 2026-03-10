@@ -22,8 +22,7 @@
  *   node scripts/firebase-token-gen.js
  *
  * Output:
- *   scripts/test-tokens.txt                                    ← gitignored, contains ready-to-use Bearer tokens
- *   postman-collections/EverCut.postman_environment.local.json ← gitignored, Postman env with tokens pre-filled
+ *   scripts/test-tokens.txt   ← gitignored, contains ready-to-use Bearer tokens
  */
 
 import admin from 'firebase-admin';
@@ -41,8 +40,6 @@ const PATHS = {
   env:            resolve(ROOT, '.env'),
   output:         resolve(__dirname, 'test-tokens.txt'),
   outputJson:     resolve(__dirname, 'test-tokens.json'),
-  postmanEnvTemplate: resolve(ROOT, 'postman-collections', 'EverCut.postman_environment.json'),
-  postmanEnvLocal:    resolve(ROOT, 'postman-collections', 'EverCut.postman_environment.local.json'),
 };
 
 // ─── Test user definitions ────────────────────────────────────────────────────
@@ -233,15 +230,11 @@ async function main() {
     lines.push(
       '─'.repeat(60),
       'How to use in Postman:',
-      '  The Postman environment file has been written automatically.',
-      '  Import postman-collections/EverCut.postman_environment.local.json in Postman',
-      '  (or re-import it each time you regenerate tokens — tokens are already set).',
-      '',
-      '  Variable names:',
-      '    customer_firebase_token  →  test-customer-001 ID token',
-      '    barber_firebase_token    →  test-barber-001 ID token',
-      '',
-      '  Tokens expire after 1 hour. Re-run this script to refresh.',
+      '  1. Copy the ID token for the role you need.',
+      '  2. In the EverCut Local environment, set the matching variable:',
+      '       customer_firebase_token  →  test-customer-001 ID token',
+      '       barber_firebase_token    →  test-barber-001 ID token',
+      '  3. Tokens expire after 1 hour. Re-run this script to refresh.',
     );
   }
 
@@ -260,42 +253,10 @@ async function main() {
   };
   writeFileSync(PATHS.outputJson, JSON.stringify(jsonOutput, null, 2));
 
-  // ── Update Postman environment file with fresh tokens ──
-  if (apiKey && existsSync(PATHS.postmanEnvTemplate)) {
-    try {
-      // Read the clean tracked template and inject tokens into a gitignored local copy
-      const postmanEnv = JSON.parse(readFileSync(PATHS.postmanEnvTemplate, 'utf-8'));
-
-      const customerToken = results['test-customer-001']?.idToken ?? null;
-      const barberToken   = results['test-barber-001']?.idToken   ?? null;
-
-      const tokenMap = {
-        customer_firebase_token: customerToken,
-        barber_firebase_token:   barberToken,
-      };
-
-      for (const entry of postmanEnv.values) {
-        if (Object.prototype.hasOwnProperty.call(tokenMap, entry.key) && tokenMap[entry.key]) {
-          entry.value = tokenMap[entry.key];
-        }
-      }
-
-      writeFileSync(PATHS.postmanEnvLocal, `${JSON.stringify(postmanEnv, null, 2)}\n`);
-      log(`  ✔  Postman environment written → ${PATHS.postmanEnvLocal}\n`);
-    } catch (err) {
-      warn(`Could not write Postman environment file: ${err.message}`);
-    }
-  }
-
   // ── Final summary ──
   banner('Done');
   log(`Tokens saved → ${PATHS.output}`);
-  log(`Tokens saved → ${PATHS.outputJson}`);
-  if (apiKey && existsSync(PATHS.postmanEnvLocal)) {
-    log(`Postman env  → ${PATHS.postmanEnvLocal}  (import this file in Postman)\n`);
-  } else {
-    log('');
-  }
+  log(`Tokens saved → ${PATHS.outputJson}\n`);
 
   if (apiKey) {
     log(`Tokens expire at: ${expiresAt}`);

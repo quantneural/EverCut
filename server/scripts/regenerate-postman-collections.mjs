@@ -1,3 +1,26 @@
+/**
+ * regenerate-postman-collections.mjs
+ *
+ * Programmatically rebuilds every Postman collection in postman-collections/.
+ *
+ * What this script does:
+ *   1. Defines all request items, pre-request scripts, and test scripts in code
+ *   2. Writes one JSON file per collection (01-authentication.json … 13-barber-ratings.json)
+ *   3. Leaves EverCut.postman_environment.json untouched — only collections are regenerated
+ *
+ * When to run it:
+ *   Run after changing route URLs, request bodies, validator shapes, or Postman test scripts.
+ *   The resulting files can be re-imported into Postman immediately.
+ *
+ * Usage:
+ *   node scripts/regenerate-postman-collections.mjs
+ *
+ * Output:
+ *   postman-collections/01-authentication.json
+ *   postman-collections/02-onboarding.json
+ *   … (one file per collection)
+ */
+
 import { mkdirSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
