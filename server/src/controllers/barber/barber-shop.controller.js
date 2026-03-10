@@ -19,6 +19,24 @@ export const updateBusinessInfo = async (req, res, next) => {
     }
 };
 
+export const getUpiDetails = async (req, res, next) => {
+    try {
+        const details = await shopService.getUpiDetails(req.user._id);
+        return res.status(200).json(ApiResponse.success(details, 'UPI details fetched'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const updateUpiDetails = async (req, res, next) => {
+    try {
+        const details = await shopService.updateUpiDetails(req.user._id, req.body);
+        return res.status(200).json(ApiResponse.success(details, 'UPI details updated'));
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const toggleShopStatus = async (req, res, next) => {
     try {
         const { status } = req.body;

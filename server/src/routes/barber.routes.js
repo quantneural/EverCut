@@ -2,11 +2,13 @@ import { Router } from 'express';
 import authenticate from '../middleware/authenticate.middleware.js';
 import { authorize } from '../middleware/authorize.middleware.js';
 import {
+    uploadBarberProfilePhoto,
     uploadEmployeePhoto,
     uploadShopCover,
     uploadShopPhotos,
 } from '../middleware/upload.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
+import { deleteBarberAccountSchema } from '../validators/account.validator.js';
 import {
     bookingIdParamSchema,
     bookingStatusSchema,
@@ -25,6 +27,7 @@ import {
     toggleStatusSchema,
     updateBusinessSchema,
     updatePinSchema,
+    updateUpiDetailsSchema,
 } from '../validators/shop.validator.js';
 import { ROLES } from '../utils/constants.js';
 
@@ -45,15 +48,20 @@ router.use(authenticate, authorize(ROLES.BARBER));
 
 // Profile and shop
 router.get('/profile', profileCtrl.getProfile);
+router.put('/profile/picture', uploadBarberProfilePhoto, profileCtrl.updatePicture);
 router.put('/profile', validate(updateBusinessSchema, 'body'), shopCtrl.updateBusinessInfo);
+router.get('/profile/upi', shopCtrl.getUpiDetails);
+router.put('/profile/upi', validate(updateUpiDetailsSchema, 'body'), shopCtrl.updateUpiDetails);
 router.put('/profile/pin', validate(updatePinSchema, 'body'), profileCtrl.updatePin);
 router.put('/profile/cover', uploadShopCover, profileCtrl.updateCover);
 router.put('/profile/toggle-status', validate(toggleStatusSchema, 'body'), shopCtrl.toggleShopStatus);
+router.post('/profile/sign-out-everywhere', profileCtrl.signOutEverywhere);
+router.delete('/profile', validate(deleteBarberAccountSchema, 'body'), profileCtrl.deleteAccount);
 
 // Employees
 router.get('/employees', employeeCtrl.getEmployees);
 router.post('/employees', uploadEmployeePhoto, validate(addEmployeeSchema, 'body'), employeeCtrl.addEmployee);
-router.put('/employees/:id', validate(employeeIdParamSchema, 'params'), validate(updateEmployeeSchema, 'body'), employeeCtrl.updateEmployee);
+router.put('/employees/:id', validate(employeeIdParamSchema, 'params'), uploadEmployeePhoto, validate(updateEmployeeSchema, 'body'), employeeCtrl.updateEmployee);
 router.delete('/employees/:id', validate(employeeIdParamSchema, 'params'), employeeCtrl.deleteEmployee);
 
 // Services

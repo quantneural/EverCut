@@ -158,6 +158,14 @@ const shopSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
+        ownerPhotoUrl: {
+            type: String,
+            default: null,
+        },
+        ownerPhotoCloudinaryId: {
+            type: String,
+            default: null,
+        },
         pinHash: {
             type: String,
             required: true,

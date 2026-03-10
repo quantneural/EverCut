@@ -52,6 +52,13 @@ export const uploadCustomerPhoto = multer({
     fileFilter: imageFilter,
 }).single('photo');
 
+/** Single barber owner profile photo */
+export const uploadBarberProfilePhoto = multer({
+    storage: makeStorage((req) => `evercut/shops/profile/${resolveActorKey(req)}`),
+    limits: { fileSize: config.upload.maxFileSize },
+    fileFilter: imageFilter,
+}).single('photo');
+
 /** Single employee photo */
 export const uploadEmployeePhoto = multer({
     storage: makeStorage((req) => `evercut/shops/employees/${resolveActorKey(req)}`),
