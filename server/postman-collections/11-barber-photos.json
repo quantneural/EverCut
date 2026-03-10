@@ -1,21 +1,205 @@
 {
   "info": {
     "name": "EverCut - Barber Photos",
-    "description": "Photo gallery management for barber shops",
+    "description": "Shop gallery management collection with ID capture and a prewired local sample upload file.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]},
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{barber_firebase_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const readScopedValue = (...keys) => {",
+          "  for (const key of keys) {",
+          "    const environmentValue = pm.environment.get(key);",
+          "    if (environmentValue) return environmentValue;",
+          "    const globalValue = pm.globals.get(key);",
+          "    if (globalValue) return globalValue;",
+          "  }",
+          "  return '';",
+          "};",
+          "const syncScopedValue = (sourceKey, collectionKey = sourceKey) => {",
+          "  const scopedValue = readScopedValue(sourceKey);",
+          "  if (scopedValue) {",
+          "    pm.collectionVariables.set(collectionKey, scopedValue);",
+          "  }",
+          "};",
+          "syncScopedValue('base_url');",
+          "syncScopedValue('api_prefix');",
+          "syncScopedValue('shared_photo_id', 'photo_id');",
+          "const collectionToken = readScopedValue('barber_firebase_token');",
+          "if (collectionToken) { pm.collectionVariables.set('barber_firebase_token', collectionToken); } else { console.warn('Set barber_firebase_token in the selected Postman environment or globals.'); }"
+        ]
+      }
+    }
+  ],
   "variable": [
-    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
-    {"key": "api_prefix", "value": "api/v1", "type": "string"},
-    {"key": "firebase_token", "value": "", "type": "string"},
-    {"key": "photo_id", "value": "", "type": "string"}
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Default local API server"
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "type": "string",
+      "description": "API prefix used by every request"
+    },
+    {
+      "key": "barber_firebase_token",
+      "value": "",
+      "type": "string",
+      "description": "Paste the ID token for test-barber-001 here"
+    },
+    {
+      "key": "photo_id",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
-    {"name": "Get All Photos", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/photos", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "photos"]}, "description": "Get all shop photos."}},
-    {"name": "Upload Photos", "event": [{"listen": "test", "script": {"exec": ["if (pm.response.code === 201) {", "    var jsonData = pm.response.json();", "    if (jsonData.data && jsonData.data.length > 0) {", "        pm.collectionVariables.set('photo_id', jsonData.data[0]._id);", "    }", "}"], "type": "text/javascript"}}], "request": {"method": "POST", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/photos", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "photos"]}, "body": {"mode": "formdata", "formdata": [{"key": "photos", "type": "file", "src": "", "description": "Multiple photos (max 10)"}, {"key": "photoType", "value": "shop_interior", "type": "text", "description": "shop_interior, shop_exterior, work_sample, team_photo, certificate, other"}, {"key": "description", "value": "Shop interior view", "type": "text"}]}, "description": "Upload multiple shop photos (max 10 per upload)."}},
-    {"name": "Get Photo by ID", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/photos/{{photo_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "photos", "{{photo_id}}"]}, "description": "Get specific photo details."}},
-    {"name": "Delete Photo", "request": {"method": "DELETE", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/photos/{{photo_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "photos", "{{photo_id}}"]}, "description": "Delete photo from Cloudinary and database."}},
-    {"name": "Get Photo Stats", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/photos/stats", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "photos", "stats"]}, "description": "Get photo statistics (count, storage used)."}}
+    {
+      "name": "1. Get All Photos And Capture Existing ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/photos",
+        "description": "Lists the current gallery and captures the first photo ID. Barber onboarding already creates three gallery photos."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const photos = Array.isArray(response.data) ? response.data : [];",
+              "const firstPhoto = photos[0];",
+              "if (firstPhoto && firstPhoto._id) { pm.collectionVariables.set('photo_id', firstPhoto._id); pm.globals.set('shared_photo_id', firstPhoto._id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Upload Photos",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/photos",
+        "description": "Uploads one gallery image using the local sample file and captures the new photo ID.",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "photos",
+              "type": "file",
+              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
+              "description": "Prewired local sample upload"
+            },
+            {
+              "key": "photoType",
+              "value": "shop_interior",
+              "type": "text"
+            },
+            {
+              "key": "description",
+              "value": "Uploaded from the automated Postman photo collection",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const response = pm.response.json();",
+              "const photos = Array.isArray(response.data) ? response.data : [];",
+              "const firstPhoto = photos[0];",
+              "if (firstPhoto && firstPhoto._id) { pm.collectionVariables.set('photo_id', firstPhoto._id); pm.globals.set('shared_photo_id', firstPhoto._id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Get Photo Stats",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/photos/stats",
+        "description": "Returns photo counts and storage totals."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Get Photo By ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/photos/{{photo_id}}",
+        "description": "Reads the currently captured photo record."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Delete Photo (Terminal)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/photos/{{photo_id}}",
+        "description": "Deletes the captured photo from both MongoDB and Cloudinary. Run this last if later requests still need the shared photo ID."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.collectionVariables.unset('photo_id');",
+              "pm.globals.unset('shared_photo_id');"
+            ]
+          }
+        }
+      ]
+    }
   ]
 }

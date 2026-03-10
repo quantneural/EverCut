@@ -1,55 +1,204 @@
 {
   "info": {
     "name": "EverCut - Barber Bookings",
-    "description": "Booking management and statistics for barber shops",
+    "description": "Barber booking administration collection. It captures separate IDs for status updates and delete-after-payment so the limitations of the public API are explicit.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]},
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{barber_firebase_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const readScopedValue = (...keys) => {",
+          "  for (const key of keys) {",
+          "    const environmentValue = pm.environment.get(key);",
+          "    if (environmentValue) return environmentValue;",
+          "    const globalValue = pm.globals.get(key);",
+          "    if (globalValue) return globalValue;",
+          "  }",
+          "  return '';",
+          "};",
+          "const syncScopedValue = (sourceKey, collectionKey = sourceKey) => {",
+          "  const scopedValue = readScopedValue(sourceKey);",
+          "  if (scopedValue) {",
+          "    pm.collectionVariables.set(collectionKey, scopedValue);",
+          "  }",
+          "};",
+          "syncScopedValue('base_url');",
+          "syncScopedValue('api_prefix');",
+          "syncScopedValue('shared_booking_id', 'booking_id_status');",
+          "syncScopedValue('shared_booking_id', 'booking_id_delete');",
+          "const collectionToken = readScopedValue('barber_firebase_token');",
+          "if (collectionToken) { pm.collectionVariables.set('barber_firebase_token', collectionToken); } else { console.warn('Set barber_firebase_token in the selected Postman environment or globals.'); }"
+        ]
+      }
+    }
+  ],
   "variable": [
-    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
-    {"key": "api_prefix", "value": "api/v1", "type": "string"},
-    {"key": "firebase_token", "value": "", "type": "string"},
-    {"key": "booking_id", "value": "", "type": "string"}
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Default local API server"
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "type": "string",
+      "description": "API prefix used by every request"
+    },
+    {
+      "key": "barber_firebase_token",
+      "value": "",
+      "type": "string",
+      "description": "Paste the ID token for test-barber-001 here"
+    },
+    {
+      "key": "booking_id_status",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "booking_id_delete",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
     {
-      "name": "Get All Bookings",
+      "name": "1. Get All Bookings And Capture IDs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/bookings",
+        "description": "Reads the barber booking dashboard payload and captures one ID for status updates plus one paid booking ID for the delete route when available."
+      },
       "event": [
         {
           "listen": "test",
           "script": {
+            "type": "text/javascript",
             "exec": [
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-              "if (pm.response.code === 200) {",
-              "    var jsonData = pm.response.json();",
-              "    if (jsonData.data && Array.isArray(jsonData.data) && jsonData.data.length > 0) {",
-              "        var firstBooking = jsonData.data[0];",
-              "        if (firstBooking._id || firstBooking.bookingId) {",
-              "            var bookingId = firstBooking._id || firstBooking.bookingId;",
-              "            pm.collectionVariables.set('booking_id', bookingId);",
-              "            console.log('Booking ID saved from first booking:', bookingId);",
-              "        }",
-              "    }",
-              "}"
-            ],
-            "type": "text/javascript"
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "const bookings = Array.isArray(data.bookings) ? data.bookings : [];",
+              "const statusBooking = bookings.find((booking) => ['pending', 'confirmed'].includes(booking.status)) || bookings[0];",
+              "const deleteBooking = bookings.find((booking) => booking.paymentStatus === 'success') || statusBooking;",
+              "const statusBookingId = statusBooking && (statusBooking._id || statusBooking.bookingId);",
+              "const deleteBookingId = deleteBooking && (deleteBooking._id || deleteBooking.bookingId);",
+              "if (statusBookingId) { pm.collectionVariables.set('booking_id_status', statusBookingId); pm.globals.set('shared_booking_id', statusBookingId); }",
+              "if (deleteBookingId) { pm.collectionVariables.set('booking_id_delete', deleteBookingId); }"
+            ]
           }
         }
-      ],
+      ]
+    },
+    {
+      "name": "2. Get Booking Stats",
       "request": {
         "method": "GET",
         "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/barber/bookings",
-          "host": ["{{base_url}}"],
-          "path": ["{{api_prefix}}", "barber", "bookings"]
-        },
-        "description": "Get all bookings for the shop with customer and employee details."
-      }
+        "url": "{{base_url}}/{{api_prefix}}/barber/bookings/stats",
+        "description": "Returns booking counts grouped by status."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
     },
-    {"name": "Get Booking Stats", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/bookings/stats", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "bookings", "stats"]}, "description": "Get booking statistics: total, pending, completed, cancelled counts."}},
-    {"name": "Get Bookings by Status", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/bookings/status?status=pending", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "bookings", "status"], "query": [{"key": "status", "value": "pending", "description": "pending, confirmed, completed, cancelled"}]}, "description": "Get bookings filtered by status with full details."}},
-    {"name": "Update Booking Status", "request": {"method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/bookings/{{booking_id}}/status", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "bookings", "{{booking_id}}", "status"]}, "body": {"mode": "raw", "raw": "{\n  \"status\": \"completed\"\n}", "options": {"raw": {"language": "json"}}}, "description": "Update booking status. Allowed: confirmed, completed, cancelled."}},
-    {"name": "Delete Booking", "request": {"method": "DELETE", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/bookings/{{booking_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "bookings", "{{booking_id}}"]}, "description": "Delete booking (only after payment success). Releases employee time slot."}}
+    {
+      "name": "3. Get Confirmed Bookings",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/bookings/status?status=confirmed",
+        "description": "Lists confirmed bookings. `bookSalon` creates bookings in the confirmed state, so this matches the current backend behaviour."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Update Booking Status",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/barber/bookings/{{booking_id_status}}/status",
+        "description": "Updates the captured booking status. Use `booking_id_status`, not the delete-only booking ID.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"completed\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Delete Paid Booking (Terminal)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/bookings/{{booking_id_delete}}",
+        "description": "Deletes a paid booking only. This succeeds when request 1 captures a booking with `paymentStatus: success`."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200 or 400', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400]); });",
+              "if (pm.response.code === 200) { pm.collectionVariables.unset('booking_id_delete'); }"
+            ]
+          }
+        }
+      ]
+    }
   ]
 }

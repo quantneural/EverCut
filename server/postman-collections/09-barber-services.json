@@ -1,21 +1,253 @@
 {
   "info": {
     "name": "EverCut - Barber Services",
-    "description": "Service catalog management for barber shops",
+    "description": "Service catalogue collection with request bodies matched to the real Joi validators and automatic shared ID capture.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]},
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{barber_firebase_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const readScopedValue = (...keys) => {",
+          "  for (const key of keys) {",
+          "    const environmentValue = pm.environment.get(key);",
+          "    if (environmentValue) return environmentValue;",
+          "    const globalValue = pm.globals.get(key);",
+          "    if (globalValue) return globalValue;",
+          "  }",
+          "  return '';",
+          "};",
+          "const syncScopedValue = (sourceKey, collectionKey = sourceKey) => {",
+          "  const scopedValue = readScopedValue(sourceKey);",
+          "  if (scopedValue) {",
+          "    pm.collectionVariables.set(collectionKey, scopedValue);",
+          "  }",
+          "};",
+          "syncScopedValue('base_url');",
+          "syncScopedValue('api_prefix');",
+          "syncScopedValue('shared_service_id', 'service_id');",
+          "const collectionToken = readScopedValue('barber_firebase_token');",
+          "if (collectionToken) { pm.collectionVariables.set('barber_firebase_token', collectionToken); } else { console.warn('Set barber_firebase_token in the selected Postman environment or globals.'); }"
+        ]
+      }
+    }
+  ],
   "variable": [
-    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
-    {"key": "api_prefix", "value": "api/v1", "type": "string"},
-    {"key": "firebase_token", "value": "", "type": "string"},
-    {"key": "service_id", "value": "", "type": "string"}
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Default local API server"
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "type": "string",
+      "description": "API prefix used by every request"
+    },
+    {
+      "key": "barber_firebase_token",
+      "value": "",
+      "type": "string",
+      "description": "Paste the ID token for test-barber-001 here"
+    },
+    {
+      "key": "service_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "single_service_name",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bundled_service_name",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
-    {"name": "Get All Services", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/services", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "services"]}, "description": "Get all services offered by the shop."}},
-    {"name": "Add Single Service", "event": [{"listen": "test", "script": {"exec": ["if (pm.response.code === 201) {", "    var jsonData = pm.response.json();", "    if (jsonData.data && jsonData.data._id) {", "        pm.collectionVariables.set('service_id', jsonData.data._id);", "    }", "}"], "type": "text/javascript"}}], "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/services", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "services"]}, "body": {"mode": "raw", "raw": "{\n  \"serviceName\": \"Haircut\",\n  \"serviceType\": \"single\",\n  \"serviceFor\": \"male\",\n  \"duration\": 30,\n  \"actualPrice\": 500,\n  \"offerPrice\": 400,\n  \"finalPrice\": 400,\n  \"imageUrl\": \"https://example.com/haircut.jpg\"\n}", "options": {"raw": {"language": "json"}}}, "description": "Add new single service."}},
-    {"name": "Add Bundled Service", "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/services", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "services"]}, "body": {"mode": "raw", "raw": "{\n  \"serviceName\": \"Premium Package\",\n  \"serviceType\": \"bundled\",\n  \"serviceFor\": \"male\",\n  \"bundledServices\": [\"Haircut\", \"Beard Trim\", \"Face Massage\"],\n  \"totalDuration\": 60,\n  \"totalPrice\": 800,\n  \"imageUrl\": \"https://example.com/package.jpg\"\n}", "options": {"raw": {"language": "json"}}}, "description": "Add new bundled service package."}},
-    {"name": "Update Service", "request": {"method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/services/{{service_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "services", "{{service_id}}"]}, "body": {"mode": "raw", "raw": "{\n  \"offerPrice\": 350,\n  \"finalPrice\": 350\n}", "options": {"raw": {"language": "json"}}}, "description": "Update service details. All fields are optional."}},
-    {"name": "Delete Service", "request": {"method": "DELETE", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/services/{{service_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "services", "{{service_id}}"]}, "description": "Delete service (soft delete)."}}
+    {
+      "name": "1. Get Services And Capture Existing ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/services",
+        "description": "Lists current services and captures the first Postman service ID when it already exists."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const services = Array.isArray(response.data) ? response.data : [];",
+              "const preferredService = services.find((service) => typeof service.serviceName === 'string' && service.serviceName.includes('Postman')) || services[0];",
+              "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Add Single Service",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/barber/services",
+        "description": "Creates a single service using only fields that the API validator accepts.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"serviceName\": \"{{single_service_name}}\",\n  \"serviceType\": \"single\",\n  \"serviceFor\": \"male\",\n  \"duration\": 30,\n  \"actualPrice\": 500,\n  \"offerPrice\": 50\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('single_service_name', `Postman Express Cut ${Date.now().toString().slice(-6)}`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const response = pm.response.json();",
+              "const serviceId = response.data && response.data._id;",
+              "if (serviceId) { pm.collectionVariables.set('service_id', serviceId); pm.globals.set('shared_service_id', serviceId); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Add Bundled Service",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/barber/services",
+        "description": "Creates a bundled service using the fields required by the backend validator.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"serviceName\": \"{{bundled_service_name}}\",\n  \"serviceType\": \"bundled\",\n  \"serviceFor\": \"male\",\n  \"actualPrice\": 900,\n  \"offerPrice\": 100,\n  \"bundledServices\": [\"Haircut\", \"Beard Trim\", \"Head Massage\"],\n  \"totalDuration\": 75\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('bundled_service_name', `Postman Grooming Combo ${Date.now().toString().slice(-6)}`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Update Service",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/barber/services/{{service_id}}",
+        "description": "Updates the captured service with a validator-approved field.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"serviceFor\": \"unisex\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Delete Service (Terminal)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/services/{{service_id}}",
+        "description": "Soft-deletes the captured service. Run this last because customer discovery and booking flows depend on the shared service ID."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.collectionVariables.unset('service_id');",
+              "pm.globals.unset('shared_service_id');"
+            ]
+          }
+        }
+      ]
+    }
   ]
 }

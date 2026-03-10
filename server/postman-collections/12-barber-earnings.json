@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "EverCut - Barber Earnings",
-    "description": "Earnings tracking for barber shops",
+    "description": "Single-request collection for the barber earnings summary. Completed bookings are required for non-zero values.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -9,47 +9,80 @@
     "bearer": [
       {
         "key": "token",
-        "value": "{{firebase_token}}",
+        "value": "{{barber_firebase_token}}",
         "type": "string"
       }
     ]
   },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const readScopedValue = (...keys) => {",
+          "  for (const key of keys) {",
+          "    const environmentValue = pm.environment.get(key);",
+          "    if (environmentValue) return environmentValue;",
+          "    const globalValue = pm.globals.get(key);",
+          "    if (globalValue) return globalValue;",
+          "  }",
+          "  return '';",
+          "};",
+          "const syncScopedValue = (sourceKey, collectionKey = sourceKey) => {",
+          "  const scopedValue = readScopedValue(sourceKey);",
+          "  if (scopedValue) {",
+          "    pm.collectionVariables.set(collectionKey, scopedValue);",
+          "  }",
+          "};",
+          "syncScopedValue('base_url');",
+          "syncScopedValue('api_prefix');",
+          "const collectionToken = readScopedValue('barber_firebase_token');",
+          "if (collectionToken) { pm.collectionVariables.set('barber_firebase_token', collectionToken); } else { console.warn('Set barber_firebase_token in the selected Postman environment or globals.'); }"
+        ]
+      }
+    }
+  ],
   "variable": [
     {
       "key": "base_url",
       "value": "http://localhost:5000",
-      "type": "string"
+      "type": "string",
+      "description": "Default local API server"
     },
     {
       "key": "api_prefix",
       "value": "api/v1",
-      "type": "string"
+      "type": "string",
+      "description": "API prefix used by every request"
     },
     {
-      "key": "firebase_token",
+      "key": "barber_firebase_token",
       "value": "",
-      "type": "string"
+      "type": "string",
+      "description": "Paste the ID token for test-barber-001 here"
     }
   ],
   "item": [
     {
-      "name": "Get Earnings",
+      "name": "1. Get Earnings",
       "request": {
         "method": "GET",
         "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/barber/earnings",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "{{api_prefix}}",
-            "barber",
-            "earnings"
-          ]
-        },
-        "description": "Get earnings summary from completed bookings.\n\nResponse:\n{\n  \"success\": true,\n  \"data\": {\n    \"totalEarning\": 50000,\n    \"lastMonthEarning\": 15000,\n    \"todayEarning\": 2500\n  }\n}"
-      }
+        "url": "{{base_url}}/{{api_prefix}}/barber/earnings",
+        "description": "Returns `totalEarning`, `lastMonthEarning`, and `todayEarning` across the barber shop employees."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

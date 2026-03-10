@@ -1,25 +1,394 @@
 {
   "info": {
     "name": "EverCut - Barber Profile & Shop",
-    "description": "Barber shop profile and business management",
+    "description": "Barber profile and shop management collection aligned with the onboarding payloads, shared IDs, and the local sample upload asset.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]},
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{barber_firebase_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const readScopedValue = (...keys) => {",
+          "  for (const key of keys) {",
+          "    const environmentValue = pm.environment.get(key);",
+          "    if (environmentValue) return environmentValue;",
+          "    const globalValue = pm.globals.get(key);",
+          "    if (globalValue) return globalValue;",
+          "  }",
+          "  return '';",
+          "};",
+          "const syncScopedValue = (sourceKey, collectionKey = sourceKey) => {",
+          "  const scopedValue = readScopedValue(sourceKey);",
+          "  if (scopedValue) {",
+          "    pm.collectionVariables.set(collectionKey, scopedValue);",
+          "  }",
+          "};",
+          "syncScopedValue('base_url');",
+          "syncScopedValue('api_prefix');",
+          "syncScopedValue('shared_shop_id', 'shop_id');",
+          "syncScopedValue('shared_barber_pin', 'barber_active_pin');",
+          "const collectionToken = readScopedValue('barber_firebase_token');",
+          "if (collectionToken) { pm.collectionVariables.set('barber_firebase_token', collectionToken); } else { console.warn('Set barber_firebase_token in the selected Postman environment or globals.'); }"
+        ]
+      }
+    }
+  ],
   "variable": [
-    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
-    {"key": "api_prefix", "value": "api/v1", "type": "string"},
-    {"key": "firebase_token", "value": "", "type": "string"}
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Default local API server"
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "type": "string",
+      "description": "API prefix used by every request"
+    },
+    {
+      "key": "barber_firebase_token",
+      "value": "",
+      "type": "string",
+      "description": "Paste the ID token for test-barber-001 here"
+    },
+    {
+      "key": "shop_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "barber_active_pin",
+      "value": "1234",
+      "type": "string"
+    },
+    {
+      "key": "barber_next_pin",
+      "value": "5678",
+      "type": "string"
+    }
   ],
   "item": [
-    {"name": "Get Profile", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/profile", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "profile"]}, "description": "Get the barber shop profile in onboarding-friendly shape. The response includes both the canonical shop fields and aliases such as `shopOwner`, `businessCategory`, `amenities`, `workingDays`, `workingHours`, `breakTimings`, `shopImages`, `photoUrl` for the owner picture, and a nested `upiDetails` object for the UPI screen."}},
-    {"name": "Update Profile Picture", "request": {"method": "PUT", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/profile/picture", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "profile", "picture"]}, "body": {"mode": "formdata", "formdata": [{"key": "photo", "type": "file", "src": "", "description": "Owner profile picture shown in Manage Account"}]}, "description": "Upload or replace the barber owner profile picture."}},
-    {"name": "Update Business Info", "request": {"method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/profile", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "profile"]}, "body": {"mode": "raw", "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"shopOwner\": \"John Doe\",\n  \"email\": \"barber@example.com\",\n  \"dateOfBirth\": \"1992-01-12\",\n  \"gender\": \"Male\",\n  \"shopName\": \"Downtown Cuts Studio\",\n  \"businessCategory\": \"Barber\",\n  \"targetCustomers\": \"men\",\n  \"shopLocation\": \"MG Road, Bengaluru\",\n  \"amenities\": [\"Air Conditioning\", \"Waiting Area\", \"Parking Area\", \"Wi-Fi\"],\n  \"workingDays\": [\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\", \"Saturday\"],\n  \"workingHours\": {\n    \"opensAt\": \"08:30\",\n    \"closesAt\": \"21:00\"\n  },\n  \"breakTimings\": [\n    {\n      \"startsAt\": \"13:00\",\n      \"endsAt\": \"14:00\"\n    }\n  ],\n  \"accountHolderName\": \"John Doe\",\n  \"bankName\": \"HDFC Bank\",\n  \"upiAddress\": \"john@upi\",\n  \"bio\": \"Updated bio and description\"\n}", "options": {"raw": {"language": "json"}}}, "description": "Update the barber profile using the same field aliases as the new onboarding flow. Canonical fields are still accepted, but these onboarding aliases are the preferred request shape."}},
-    {"name": "Get UPI Details", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/profile/upi", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "profile", "upi"]}, "description": "Fetch the dedicated UPI payload used by the UPI Details screen. Returns `accountHolderName`, `bankName`, `upiId`, `upiAddress`, `isVerified`, and `verificationStatus`."}},
-    {"name": "Update UPI Details", "request": {"method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/profile/upi", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "profile", "upi"]}, "body": {"mode": "raw", "raw": "{\n  \"accountHolderName\": \"Monkey Dragon Luffy\",\n  \"bankName\": \"Grand Line Bank\",\n  \"upiAddress\": \"kingofpirates@onepiece\"\n}", "options": {"raw": {"language": "json"}}}, "description": "Update only the payment fields used by the dedicated UPI screen."}},
-    {"name": "Update PIN", "request": {"method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/profile/pin", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "profile", "pin"]}, "body": {"mode": "raw", "raw": "{\n  \"currentPin\": \"1234\",\n  \"newPin\": \"5678\",\n  \"confirmPin\": \"5678\"\n}", "options": {"raw": {"language": "json"}}}, "description": "Update shop access PIN (exactly 4 digits)."}},
-    {"name": "Update Cover Image", "request": {"method": "PUT", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/profile/cover", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "profile", "cover"]}, "body": {"mode": "formdata", "formdata": [{"key": "cover", "type": "file", "src": "", "description": "Shop cover image"}]}, "description": "Update shop cover image (uploaded to Cloudinary)."}},
-    {"name": "Toggle Shop Status", "request": {"method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/profile/toggle-status", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "profile", "toggle-status"]}, "body": {"mode": "raw", "raw": "{\n  \"isOpen\": true\n}", "options": {"raw": {"language": "json"}}}, "description": "Open or close shop. If isOpen not provided, it toggles current status."}},
-    {"name": "Sign-Out Everywhere", "request": {"method": "POST", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/profile/sign-out-everywhere", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "profile", "sign-out-everywhere"]}, "description": "Revokes all active Firebase refresh tokens for the authenticated barber so all existing sessions are forced to sign in again. Run this only when you are done with the current token, because subsequent requests will require a fresh sign-in."}},
-    {"name": "Delete Account", "request": {"method": "DELETE", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/profile", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "profile"]}, "body": {"mode": "raw", "raw": "{\n  \"currentPin\": \"5678\"\n}", "options": {"raw": {"language": "json"}}}, "description": "PIN-protected barber account deletion. The barber `User` and `Shop` records are soft-deleted in MongoDB, the shop is hidden from active queries, and Firebase access is disabled so the deleted account can no longer log in."}}
+    {
+      "name": "1. Get Profile And Capture Shop ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/profile",
+        "description": "Reads the barber profile and stores the current shop ID for the dependent collections."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const shopId = response.data && response.data._id;",
+              "if (shopId) { pm.collectionVariables.set('shop_id', shopId); pm.globals.set('shared_shop_id', shopId); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Update Business Info",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/barber/profile",
+        "description": "Updates the barber profile using the onboarding-friendly request shape that the backend validators actually accept.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Barber\",\n  \"shopOwner\": \"Test Barber\",\n  \"email\": \"test.barber@example.com\",\n  \"phoneNumber\": \"+15550000002\",\n  \"dateOfBirth\": \"1991-01-12\",\n  \"gender\": \"Male\",\n  \"shopName\": \"Postman Test Barber Studio\",\n  \"businessCategory\": \"Barber\",\n  \"targetCustomers\": \"male\",\n  \"shopLocation\": \"MG Road, Bengaluru\",\n  \"location\": {\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]},\n  \"amenities\": [\"Air Conditioning\", \"Waiting Area\", \"Parking Area\", \"Wi-Fi\"],\n  \"workingDays\": [\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\", \"Saturday\"],\n  \"workingHours\": {\n    \"opensAt\": \"09:00\",\n    \"closesAt\": \"20:00\"\n  },\n  \"breakTimings\": [\n    {\n      \"startsAt\": \"13:00\",\n      \"endsAt\": \"14:00\"\n    }\n  ],\n  \"accountHolderName\": \"Test Barber\",\n  \"bankName\": \"HDFC Bank\",\n  \"upiAddress\": \"test.barber@upi\",\n  \"bio\": \"Updated from the automated Postman profile collection.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Get UPI Details",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/profile/upi",
+        "description": "Reads the dedicated UPI payload."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Update UPI Details",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/barber/profile/upi",
+        "description": "Updates only the dedicated payment fields.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"accountHolderName\": \"Test Barber\",\n  \"bankName\": \"HDFC Bank\",\n  \"upiAddress\": \"test.barber+verified@upi\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Ensure Shop Is Open",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/barber/profile/toggle-status",
+        "description": "Explicitly opens the shop so customer discovery and bookings can run immediately after this collection.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Update Profile Picture",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/profile/picture",
+        "description": "Uploads or replaces the owner profile picture using the local sample image.",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "photo",
+              "type": "file",
+              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
+              "description": "Prewired local sample upload"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Update Cover Image",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/profile/cover",
+        "description": "Uploads or replaces the shop cover image using the same local sample file.",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "cover",
+              "type": "file",
+              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
+              "description": "Prewired local sample upload"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Update PIN",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/barber/profile/pin",
+        "description": "Flips the barber PIN between 1234 and 5678 so the request stays rerunnable.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"currentPin\": \"{{barber_active_pin}}\",\n  \"newPin\": \"{{barber_next_pin}}\",\n  \"confirmNewPin\": \"{{barber_next_pin}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const currentPin = pm.collectionVariables.get('barber_active_pin') || '1234';",
+              "const nextPin = currentPin === '1234' ? '5678' : '1234';",
+              "pm.collectionVariables.set('barber_next_pin', nextPin);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const nextPin = pm.collectionVariables.get('barber_next_pin');",
+              "pm.collectionVariables.set('barber_active_pin', nextPin);",
+              "pm.globals.set('shared_barber_pin', nextPin);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9A. Sign-Out Everywhere (Terminal)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/profile/sign-out-everywhere",
+        "description": "Revokes the current Firebase session. Run this only when you are finished with the current barber token."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9B. Delete Account (Terminal)",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/barber/profile",
+        "description": "Soft-deletes the barber account and disables the Firebase user. Run this instead of the sign-out request when you want the account deleted.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"currentPin\": \"{{barber_active_pin}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    }
   ]
 }

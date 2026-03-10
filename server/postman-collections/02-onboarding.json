@@ -1,158 +1,178 @@
 {
   "info": {
     "name": "EverCut - Onboarding",
-    "description": "First-time customer and barber onboarding endpoints",
+    "description": "Customer and barber onboarding requests wired for the Firebase test users and the local sample upload asset.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "auth": {
-    "type": "bearer",
-    "bearer": [
-      {
-        "key": "token",
-        "value": "{{firebase_token}}",
-        "type": "string"
-      }
-    ]
   },
   "variable": [
     {
       "key": "base_url",
       "value": "http://localhost:5000",
-      "type": "string"
+      "type": "string",
+      "description": "Default local API server"
     },
     {
       "key": "api_prefix",
       "value": "api/v1",
-      "type": "string"
+      "type": "string",
+      "description": "API prefix used by every request"
     },
     {
-      "key": "firebase_token",
+      "key": "customer_firebase_token",
       "value": "",
-      "type": "string"
+      "type": "string",
+      "description": "Paste the ID token for test-customer-001 here"
+    },
+    {
+      "key": "barber_firebase_token",
+      "value": "",
+      "type": "string",
+      "description": "Paste the ID token for test-barber-001 here"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const readScopedValue = (...keys) => {",
+          "  for (const key of keys) {",
+          "    const environmentValue = pm.environment.get(key);",
+          "    if (environmentValue) return environmentValue;",
+          "    const globalValue = pm.globals.get(key);",
+          "    if (globalValue) return globalValue;",
+          "  }",
+          "  return '';",
+          "};",
+          "const baseUrl = readScopedValue('base_url');",
+          "if (baseUrl) { pm.collectionVariables.set('base_url', baseUrl); }",
+          "const apiPrefix = readScopedValue('api_prefix');",
+          "if (apiPrefix) { pm.collectionVariables.set('api_prefix', apiPrefix); }",
+          "const customerToken = readScopedValue('customer_firebase_token');",
+          "if (customerToken) { pm.collectionVariables.set('customer_firebase_token', customerToken); }",
+          "const barberToken = readScopedValue('barber_firebase_token');",
+          "if (barberToken) { pm.collectionVariables.set('barber_firebase_token', barberToken); }"
+        ]
+      }
     }
   ],
   "item": [
     {
-      "name": "Complete Customer Profile",
+      "name": "1. Complete Customer Profile",
       "request": {
         "method": "POST",
         "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/onboarding/customers",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "{{api_prefix}}",
-            "onboarding",
-            "customers"
-          ]
-        },
+        "url": "{{base_url}}/{{api_prefix}}/onboarding/customers",
+        "description": "Creates the customer profile for test-customer-001. A rerun returns 409 because onboarding only succeeds once per Firebase user.",
         "body": {
           "mode": "formdata",
           "formdata": [
             {
               "key": "firstName",
-              "value": "John",
-              "type": "text",
-              "description": "Customer first name"
+              "value": "Test",
+              "type": "text"
             },
             {
               "key": "lastName",
-              "value": "Doe",
-              "type": "text",
-              "description": "Customer last name"
+              "value": "Customer",
+              "type": "text"
             },
             {
               "key": "phoneNumber",
-              "value": "+1234567890",
-              "type": "text",
-              "description": "Phone number with country code"
+              "value": "+15550000001",
+              "type": "text"
             },
             {
               "key": "email",
-              "value": "customer@example.com",
-              "type": "text",
-              "description": "Email address"
+              "value": "test.customer@example.com",
+              "type": "text"
             },
             {
               "key": "gender",
               "value": "Male",
-              "type": "text",
-              "description": "Male, Female, or Other"
+              "type": "text"
             },
             {
               "key": "dateOfBirth",
-              "value": "1990-01-01",
-              "type": "text",
-              "description": "Date of birth (YYYY-MM-DD)"
+              "value": "1994-06-15",
+              "type": "text"
             },
             {
               "key": "address",
-              "value": "123 Main St, New York, NY",
-              "type": "text",
-              "description": "Full address"
+              "value": "Church Street, Bengaluru",
+              "type": "text"
             },
             {
               "key": "location",
-              "value": "{\"type\":\"Point\",\"coordinates\":[-73.935242,40.730610]}",
+              "value": "{\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]}",
               "type": "text",
-              "description": "GeoJSON Point with [longitude, latitude]"
+              "description": "GeoJSON point near the barber test shop"
             },
             {
               "key": "photo",
               "type": "file",
-              "src": "",
-              "description": "Profile photo (required)"
+              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
+              "description": "Prewired local sample upload"
             }
           ]
         },
-        "description": "Complete customer registration with profile photo upload. Creates User and CustomerProfile records.\n\nRequired Fields:\n- firstName, lastName, phoneNumber, email, gender, dateOfBirth, address, location, photo"
-      }
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customer_firebase_token}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Complete Barber Profile (New Onboarding)",
+      "name": "2. Complete Barber Profile",
       "request": {
         "method": "POST",
         "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/onboarding/barbers",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "{{api_prefix}}",
-            "onboarding",
-            "barbers"
-          ]
-        },
+        "url": "{{base_url}}/{{api_prefix}}/onboarding/barbers",
+        "description": "Creates the barber shop for test-barber-001. The three shop image fields already point to the local sample file.",
         "body": {
           "mode": "formdata",
           "formdata": [
             {
               "key": "firstName",
-              "value": "John",
-              "type": "text",
-              "description": "Personal information step"
+              "value": "Test",
+              "type": "text"
             },
             {
               "key": "lastName",
-              "value": "Doe",
+              "value": "Barber",
               "type": "text"
             },
             {
               "key": "email",
-              "value": "barber@example.com",
+              "value": "test.barber@example.com",
               "type": "text"
             },
             {
               "key": "phoneNumber",
-              "value": "+919111111111",
+              "value": "+15550000002",
               "type": "text"
             },
             {
               "key": "dateOfBirth",
-              "value": "1992-01-12",
+              "value": "1991-01-12",
               "type": "text"
             },
             {
@@ -162,15 +182,13 @@
             },
             {
               "key": "shopName",
-              "value": "Downtown Cuts",
-              "type": "text",
-              "description": "Business profile step"
+              "value": "Postman Test Barber Studio",
+              "type": "text"
             },
             {
               "key": "shopOwner",
-              "value": "John Doe",
-              "type": "text",
-              "description": "Optional alias for the owner/business name shown in the shop profile"
+              "value": "Test Barber",
+              "type": "text"
             },
             {
               "key": "businessCategory",
@@ -179,9 +197,8 @@
             },
             {
               "key": "targetCustomers",
-              "value": "men",
-              "type": "text",
-              "description": "Accepted: men/women/unisex or male/female/unisex"
+              "value": "male",
+              "type": "text"
             },
             {
               "key": "shopLocation",
@@ -191,19 +208,18 @@
             {
               "key": "location",
               "value": "{\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]}",
-              "type": "text"
+              "type": "text",
+              "description": "Matches the customer discovery coordinates"
             },
             {
               "key": "amenities",
               "value": "[\"Air Conditioning\",\"Waiting Area\",\"Drinking Water\",\"Washrooms\",\"Parking Area\",\"Wi-Fi\",\"Charging Points\"]",
-              "type": "text",
-              "description": "Amenities step (JSON array)"
+              "type": "text"
             },
             {
               "key": "workingDays",
               "value": "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\",\"Saturday\"]",
-              "type": "text",
-              "description": "Availability step (JSON array)"
+              "type": "text"
             },
             {
               "key": "workingHours",
@@ -213,14 +229,12 @@
             {
               "key": "breakTimings",
               "value": "[{\"startsAt\":\"13:00\",\"endsAt\":\"14:00\"}]",
-              "type": "text",
-              "description": "Optional break windows (JSON array)"
+              "type": "text"
             },
             {
               "key": "accountHolderName",
-              "value": "John Doe",
-              "type": "text",
-              "description": "Payout step"
+              "value": "Test Barber",
+              "type": "text"
             },
             {
               "key": "bankName",
@@ -229,14 +243,13 @@
             },
             {
               "key": "upiAddress",
-              "value": "john@upi",
+              "value": "test.barber@upi",
               "type": "text"
             },
             {
               "key": "pin",
               "value": "1234",
-              "type": "text",
-              "description": "Exactly 4 digits"
+              "type": "text"
             },
             {
               "key": "confirmPin",
@@ -246,25 +259,49 @@
             {
               "key": "shopImages",
               "type": "file",
-              "src": "",
-              "description": "Required image 1/3"
+              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
+              "description": "Sample shop image 1 of 3"
             },
             {
               "key": "shopImages",
               "type": "file",
-              "src": "",
-              "description": "Required image 2/3"
+              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
+              "description": "Sample shop image 2 of 3"
             },
             {
               "key": "shopImages",
               "type": "file",
-              "src": "",
-              "description": "Required image 3/3"
+              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
+              "description": "Sample shop image 3 of 3"
             }
           ]
         },
-        "description": "Complete barber/shop registration using multipart/form-data.\n\nRequired groups:\n- Personal: firstName, lastName, email/emailId, phoneNumber, dateOfBirth, gender\n- Business: shopName, optional shopOwner/ownerName, businessCategory/shopCategory, targetCustomers, shopLocation/address, location\n- Availability: workingDays/availableDays, workingHours (or openTime + closeTime)\n- Payout: accountHolderName, bankName, upiAddress/upiId\n- Security: pin + confirmPin (exactly 4 digits)\n- Images: exactly 3 files in `shopImages`\n\nResponse data includes created user, the barber shop profile in onboarding-friendly shape, and the initial photo documents."
-      }
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{barber_firebase_token}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
+              "const response = pm.response.code === 201 ? pm.response.json() : null;",
+              "const shopId = response && response.data && response.data.shop && response.data.shop._id;",
+              "if (shopId) { pm.globals.set('shared_shop_id', shopId); }",
+              "if (pm.response.code === 201) { pm.globals.set('shared_barber_pin', '1234'); }"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

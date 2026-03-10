@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "EverCut - Barber Ratings",
-    "description": "Focused Postman collection for barber rating routes using seeded mock data and the normal Firebase-authenticated barber user.",
+    "description": "Focused Postman collection for barber rating routes using seeded mock data and the Firebase-authenticated barber user. This remains the reference standard for seeded-ID capture.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -9,26 +9,58 @@
     "bearer": [
       {
         "key": "token",
-        "value": "{{firebase_token}}",
+        "value": "{{barber_firebase_token}}",
         "type": "string"
       }
     ]
   },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const readScopedValue = (...keys) => {",
+          "  for (const key of keys) {",
+          "    const environmentValue = pm.environment.get(key);",
+          "    if (environmentValue) return environmentValue;",
+          "    const globalValue = pm.globals.get(key);",
+          "    if (globalValue) return globalValue;",
+          "  }",
+          "  return '';",
+          "};",
+          "const syncScopedValue = (sourceKey, collectionKey = sourceKey) => {",
+          "  const scopedValue = readScopedValue(sourceKey);",
+          "  if (scopedValue) {",
+          "    pm.collectionVariables.set(collectionKey, scopedValue);",
+          "  }",
+          "};",
+          "syncScopedValue('base_url');",
+          "syncScopedValue('api_prefix');",
+          "const collectionToken = readScopedValue('barber_firebase_token');",
+          "if (collectionToken) { pm.collectionVariables.set('barber_firebase_token', collectionToken); } else { console.warn('Set barber_firebase_token in the selected Postman environment or globals.'); }"
+        ]
+      }
+    }
+  ],
   "variable": [
     {
       "key": "base_url",
       "value": "http://localhost:5000",
-      "type": "string"
+      "type": "string",
+      "description": "Default local API server"
     },
     {
       "key": "api_prefix",
       "value": "api/v1",
-      "type": "string"
+      "type": "string",
+      "description": "API prefix used by every request"
     },
     {
-      "key": "firebase_token",
+      "key": "barber_firebase_token",
       "value": "",
-      "type": "string"
+      "type": "string",
+      "description": "Paste the ID token for test-barber-001 here"
     },
     {
       "key": "rating_id_add_reply",
@@ -49,6 +81,12 @@
   "item": [
     {
       "name": "1. Get Ratings And Capture Seeded IDs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/barber/ratings",
+        "description": "Run this first. It captures the three seeded rating IDs created by `node scripts/seed-barber-rating-mock-data.js`."
+      },
       "event": [
         {
           "listen": "test",
@@ -64,27 +102,14 @@
               "};",
               "capture('rating_id_add_reply', '[ADD_REPLY_TARGET]');",
               "capture('rating_id_update_reply', '[UPDATE_REPLY_TARGET]');",
-              "capture('rating_id_remove_rating', '[REMOVE_RATING_TARGET]');"
+              "capture('rating_id_remove_rating', '[REMOVE_RATING_TARGET]');",
+              "if (!pm.collectionVariables.get('rating_id_add_reply') || !pm.collectionVariables.get('rating_id_update_reply') || !pm.collectionVariables.get('rating_id_remove_rating')) {",
+              "  console.warn('Seeded rating markers were not found. Run `node scripts/seed-barber-rating-mock-data.js` for test-barber-001.');",
+              "}"
             ]
           }
         }
-      ],
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/barber/ratings",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "{{api_prefix}}",
-            "barber",
-            "ratings"
-          ]
-        },
-        "description": "Run this first. It confirms the barber can read the seeded ratings and stores the three mock rating IDs into collection variables."
-      }
+      ]
     },
     {
       "name": "2. Add Reply",
@@ -96,6 +121,8 @@
             "value": "application/json"
           }
         ],
+        "url": "{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_add_reply}}/reply",
+        "description": "Adds a reply to the seeded rating that has no reply yet.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"replyText\": \"Thanks for the feedback. We appreciate your visit.\"\n}",
@@ -104,22 +131,19 @@
               "language": "json"
             }
           }
-        },
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/barber/ratings/{{rating_id_add_reply}}/reply",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "{{api_prefix}}",
-            "barber",
-            "ratings",
-            "{{rating_id_add_reply}}",
-            "reply"
-          ]
-        },
-        "description": "Adds a reply to the seeded rating that does not have one yet."
-      }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "3. Update Reply",
@@ -131,6 +155,8 @@
             "value": "application/json"
           }
         ],
+        "url": "{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_update_reply}}/reply",
+        "description": "Updates the seeded reply on the dedicated rating fixture.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"replyText\": \"Updated reply from Postman for the seeded barber rating flow.\"\n}",
@@ -139,63 +165,59 @@
               "language": "json"
             }
           }
-        },
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/barber/ratings/{{rating_id_update_reply}}/reply",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "{{api_prefix}}",
-            "barber",
-            "ratings",
-            "{{rating_id_update_reply}}",
-            "reply"
-          ]
-        },
-        "description": "Updates the existing seeded reply."
-      }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "4. Delete Reply",
       "request": {
         "method": "DELETE",
         "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/barber/ratings/{{rating_id_update_reply}}/reply",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "{{api_prefix}}",
-            "barber",
-            "ratings",
-            "{{rating_id_update_reply}}",
-            "reply"
-          ]
-        },
+        "url": "{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_update_reply}}/reply",
         "description": "Deletes the reply from the same seeded rating used by the update step."
-      }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "5. Remove Rating",
       "request": {
         "method": "DELETE",
         "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/barber/ratings/{{rating_id_remove_rating}}",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "{{api_prefix}}",
-            "barber",
-            "ratings",
-            "{{rating_id_remove_rating}}"
-          ]
-        },
-        "description": "Deletes the seeded rating dedicated to the barber delete-rating route."
-      }
+        "url": "{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_remove_rating}}",
+        "description": "Deletes the seeded rating dedicated to the remove-rating route."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

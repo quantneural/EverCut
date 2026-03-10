@@ -1,73 +1,182 @@
 {
   "info": {
     "name": "EverCut - Customer Ratings",
-    "description": "Customer rating and review management",
+    "description": "Customer rating flow with a bootstrap request that captures the nearby Postman shop ID before submitting the rating.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]},
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{customer_firebase_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const readScopedValue = (...keys) => {",
+          "  for (const key of keys) {",
+          "    const environmentValue = pm.environment.get(key);",
+          "    if (environmentValue) return environmentValue;",
+          "    const globalValue = pm.globals.get(key);",
+          "    if (globalValue) return globalValue;",
+          "  }",
+          "  return '';",
+          "};",
+          "const syncScopedValue = (sourceKey, collectionKey = sourceKey) => {",
+          "  const scopedValue = readScopedValue(sourceKey);",
+          "  if (scopedValue) {",
+          "    pm.collectionVariables.set(collectionKey, scopedValue);",
+          "  }",
+          "};",
+          "syncScopedValue('base_url');",
+          "syncScopedValue('api_prefix');",
+          "syncScopedValue('shared_shop_id', 'shop_id');",
+          "const collectionToken = readScopedValue('customer_firebase_token');",
+          "if (collectionToken) { pm.collectionVariables.set('customer_firebase_token', collectionToken); } else { console.warn('Set customer_firebase_token in the selected Postman environment or globals.'); }"
+        ]
+      }
+    }
+  ],
   "variable": [
-    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
-    {"key": "api_prefix", "value": "api/v1", "type": "string"},
-    {"key": "firebase_token", "value": "", "type": "string"},
-    {"key": "shop_id", "value": "", "type": "string"}
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Default local API server"
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "type": "string",
+      "description": "API prefix used by every request"
+    },
+    {
+      "key": "customer_firebase_token",
+      "value": "",
+      "type": "string",
+      "description": "Paste the ID token for test-customer-001 here"
+    },
+    {
+      "key": "coordinates",
+      "value": "77.5946,12.9716",
+      "type": "string"
+    },
+    {
+      "key": "shop_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customer_email",
+      "value": "test.customer@example.com",
+      "type": "string"
+    }
   ],
   "item": [
     {
-      "name": "Add Rating",
+      "name": "1. Get Nearby Shops And Capture Shop ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/customer/shops/nearby?coordinates={{coordinates}}",
+        "description": "Captures the nearby Postman shop ID so the rest of the rating flow is ready without manual copy-paste."
+      },
       "event": [
         {
           "listen": "test",
           "script": {
+            "type": "text/javascript",
             "exec": [
-              "pm.test('status is 200 or 201', function () {",
-              "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
-              "});"
-            ],
-            "type": "text/javascript"
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const shops = Array.isArray(response.data) ? response.data : [];",
+              "const preferredShop = shops.find((shop) => typeof shop.shopName === 'string' && shop.shopName.includes('Postman')) || shops[0];",
+              "if (preferredShop && preferredShop._id) { pm.collectionVariables.set('shop_id', preferredShop._id); pm.globals.set('shared_shop_id', preferredShop._id); }"
+            ]
           }
         }
-      ],
+      ]
+    },
+    {
+      "name": "2. Add Rating",
       "request": {
         "method": "POST",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/customer/ratings",
-          "host": ["{{base_url}}"],
-          "path": ["{{api_prefix}}", "customer", "ratings"]
-        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/customer/ratings",
+        "description": "Creates a new rating for the captured shop. The API allows only one rating per customer per shop, so reruns return 409 instead of 201 after the first success.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"shopId\": \"{{shop_id}}\",\n  \"rating\": 5,\n  \"review\": \"Excellent service! Very professional and friendly staff.\"\n}",
-          "options": {"raw": {"language": "json"}}
-        },
-        "description": "Add or update rating for a shop.\n\nRequired Fields:\n- shopId: Shop ID\n- rating: 1-5 (integer)\n- review: Text review (optional, max 500 chars)\n\nBusiness Rules:\n- One rating per customer per shop\n- If rating exists, it will be updated\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"Rating added\",\n  \"data\": {...}\n}"
-      }
+          "raw": "{\n  \"shopId\": \"{{shop_id}}\",\n  \"rating\": 5,\n  \"review\": \"Postman collection review for the Firebase customer flow.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Get Shop Ratings",
+      "name": "3. Get Shop Ratings",
       "request": {
         "method": "GET",
         "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/customer/shops/{{shop_id}}/ratings",
-          "host": ["{{base_url}}"],
-          "path": ["{{api_prefix}}", "customer", "shops", "{{shop_id}}", "ratings"]
-        },
-        "description": "Get all ratings for a shop with customer details and shop replies.\n\nResponse:\n{\n  \"success\": true,\n  \"data\": [\n    {\n      \"ratingId\": \"...\",\n      \"rating\": 5,\n      \"review\": \"Great service!\",\n      \"user\": {\n        \"firstName\": \"John\",\n        \"photoUrl\": \"...\"\n      },\n      \"reply\": {\n        \"text\": \"Thank you for your feedback!\",\n        \"repliedAt\": \"2024-03-15T10:30:00.000Z\"\n      },\n      \"createdAt\": \"2024-03-15T10:30:00.000Z\"\n    }\n  ]\n}"
-      }
+        "url": "{{base_url}}/{{api_prefix}}/customer/shops/{{shop_id}}/ratings",
+        "description": "Lists all ratings for the captured shop, including barber replies."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Get Rating Summary",
+      "name": "4. Get Rating Summary",
       "request": {
         "method": "GET",
         "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/customer/shops/{{shop_id}}/ratings/summary",
-          "host": ["{{base_url}}"],
-          "path": ["{{api_prefix}}", "customer", "shops", "{{shop_id}}", "ratings", "summary"]
-        },
-        "description": "Get rating summary with average, count, and distribution.\n\nResponse:\n{\n  \"success\": true,\n  \"data\": {\n    \"averageRating\": 4.5,\n    \"totalRatings\": 120,\n    \"distribution\": {\n      \"5\": 80,\n      \"4\": 30,\n      \"3\": 8,\n      \"2\": 2,\n      \"1\": 0\n    }\n  }\n}"
-      }
+        "url": "{{base_url}}/{{api_prefix}}/customer/shops/{{shop_id}}/ratings/summary",
+        "description": "Returns the rating summary payload for the captured shop."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

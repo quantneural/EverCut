@@ -1,39 +1,75 @@
 {
   "info": {
     "name": "EverCut - Authentication",
-    "description": "Firebase-based session bootstrap and health endpoints",
+    "description": "Session bootstrap endpoints for the Firebase customer and barber test users created by server/scripts/firebase-token-gen.js.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "auth": {
-    "type": "bearer",
-    "bearer": [
-      {
-        "key": "token",
-        "value": "{{firebase_token}}",
-        "type": "string"
-      }
-    ]
   },
   "variable": [
     {
       "key": "base_url",
       "value": "http://localhost:5000",
-      "type": "string"
+      "type": "string",
+      "description": "Default local API server"
     },
     {
       "key": "api_prefix",
       "value": "api/v1",
+      "type": "string",
+      "description": "API prefix used by every request"
+    },
+    {
+      "key": "customer_firebase_token",
+      "value": "",
+      "type": "string",
+      "description": "Paste the ID token for test-customer-001 here"
+    },
+    {
+      "key": "barber_firebase_token",
+      "value": "",
+      "type": "string",
+      "description": "Paste the ID token for test-barber-001 here"
+    },
+    {
+      "key": "last_session_role",
+      "value": "",
       "type": "string"
     },
     {
-      "key": "firebase_token",
+      "key": "last_session_is_new_user",
       "value": "",
       "type": "string"
     }
   ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const readScopedValue = (...keys) => {",
+          "  for (const key of keys) {",
+          "    const environmentValue = pm.environment.get(key);",
+          "    if (environmentValue) return environmentValue;",
+          "    const globalValue = pm.globals.get(key);",
+          "    if (globalValue) return globalValue;",
+          "  }",
+          "  return '';",
+          "};",
+          "const baseUrl = readScopedValue('base_url');",
+          "if (baseUrl) { pm.collectionVariables.set('base_url', baseUrl); }",
+          "const apiPrefix = readScopedValue('api_prefix');",
+          "if (apiPrefix) { pm.collectionVariables.set('api_prefix', apiPrefix); }",
+          "const customerToken = readScopedValue('customer_firebase_token');",
+          "if (customerToken) { pm.collectionVariables.set('customer_firebase_token', customerToken); }",
+          "const barberToken = readScopedValue('barber_firebase_token');",
+          "if (barberToken) { pm.collectionVariables.set('barber_firebase_token', barberToken); }"
+        ]
+      }
+    }
+  ],
   "item": [
     {
-      "name": "Create Session",
+      "name": "1. Create Customer Session",
       "request": {
         "method": "POST",
         "header": [
@@ -42,17 +78,8 @@
             "value": "application/json"
           }
         ],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/auth/session",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "{{api_prefix}}",
-            "auth",
-            "session"
-          ]
-        },
+        "url": "{{base_url}}/{{api_prefix}}/auth/session",
+        "description": "Creates an authenticated API session for the Firebase customer test user. Run this before customer onboarding or customer collections.",
         "body": {
           "mode": "raw",
           "raw": "{}",
@@ -62,26 +89,104 @@
             }
           }
         },
-        "description": "Create auth session context after Firebase token verification. Returns profile if the user already exists, or indicates the user must complete onboarding.\n\nRequest Body:\n- Optional: roleType ('CUSTOMER' or 'BARBER'), deprecated and ignored by backend.\n\nResponse (New User):\n{\n  \"success\": true,\n  \"message\": \"New user. Please complete your profile.\",\n  \"data\": {\n    \"isNewUser\": true,\n    \"firebaseUid\": \"abc123\",\n    \"phoneNumber\": \"+1234567890\",\n    \"email\": \"barber@example.com\"\n  }\n}\n\nResponse (Existing Barber User):\n{\n  \"success\": true,\n  \"message\": \"Login successful\",\n  \"data\": {\n    \"isNewUser\": false,\n    \"user\": {...},\n    \"profile\": {\n      \"shopName\": \"Downtown Cuts\",\n      \"shopOwner\": \"John Doe\",\n      \"businessCategory\": \"Barber\",\n      \"shopLocation\": \"MG Road, Bengaluru\",\n      \"amenities\": [...],\n      \"workingDays\": [...],\n      \"workingHours\": {\n        \"opensAt\": \"09:00\",\n        \"closesAt\": \"20:00\"\n      },\n      \"breakTimings\": [...],\n      \"shopImages\": [\"https://...\"]\n    }\n  }\n}\n\nDeleted/disabled accounts:\n- Return `401 Unauthorized`\n- Cannot create a new session or re-onboard with the same deleted account token"
-      }
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customer_firebase_token}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "pm.collectionVariables.set('last_session_role', 'CUSTOMER');",
+              "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(response.data && response.data.isNewUser)));"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Health Check",
+      "name": "2. Create Barber Session",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/auth/session",
+        "description": "Creates an authenticated API session for the Firebase barber test user. Run this before barber onboarding or barber collections.",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{barber_firebase_token}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "pm.collectionVariables.set('last_session_role', 'BARBER');",
+              "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(response.data && response.data.isNewUser)));",
+              "const profile = response.data && response.data.profile;",
+              "const shopId = profile && profile._id ? profile._id : '';",
+              "if (shopId) { pm.globals.set('shared_shop_id', shopId); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Health Check",
       "request": {
         "method": "GET",
         "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/health",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "{{api_prefix}}",
-            "health"
-          ]
-        },
-        "description": "API health check endpoint to verify the server is running.\n\nResponse:\n{\n  \"success\": true,\n  \"message\": \"EverCut API is running\",\n  \"timestamp\": \"2024-03-15T10:30:00.000Z\"\n}"
-      }
+        "url": "{{base_url}}/{{api_prefix}}/health",
+        "description": "Simple liveness check for the API server.",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
