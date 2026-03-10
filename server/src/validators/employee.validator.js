@@ -24,12 +24,15 @@ export const updateEmployeeSchema = Joi.object({
     phoneNumber: Joi.string(),
     gender: Joi.string().valid(...ALL_GENDERS),
     dateOfBirth: Joi.date(),
-    workingHours: Joi.object({
-        start: Joi.string(),
-        end: Joi.string(),
-    }),
-    blockedDates: Joi.array().items(Joi.date()),
-}).min(1);
+    workingHours: Joi.alternatives().try(
+        Joi.object({
+            start: Joi.string(),
+            end: Joi.string(),
+        }),
+        Joi.string(),
+    ),
+    blockedDates: Joi.alternatives().try(Joi.array().items(Joi.date()), Joi.string()),
+});
 
 export const employeeIdParamSchema = Joi.object({
     id: objectId.required(),

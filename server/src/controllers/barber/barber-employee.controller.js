@@ -21,7 +21,7 @@ export const getEmployees = async (req, res, next) => {
 
 export const updateEmployee = async (req, res, next) => {
     try {
-        const employee = await employeeService.updateEmployee(req.user._id, req.params.id, req.body);
+        const employee = await employeeService.updateEmployee(req.user._id, req.params.id, req.body, req.file);
         return res.status(200).json(ApiResponse.success(employee, 'Employee updated'));
     } catch (err) {
         next(err);
