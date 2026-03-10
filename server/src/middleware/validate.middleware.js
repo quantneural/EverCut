@@ -1,4 +1,5 @@
 import { BadRequestError } from '../utils/api-error.js';
+import { cleanupUploadedCloudinaryFiles } from '../utils/cloudinary-cleanup.utils.js';
 
 /**
  * Generic validation middleware factory.
@@ -10,7 +11,7 @@ import { BadRequestError } from '../utils/api-error.js';
  *   router.post('/booking', validate(bookingSchema, 'body'), controller);
  */
 export const validate = (schema, source = 'body') => {
-    return (req, _res, next) => {
+    return async (req, _res, next) => {
         const { error, value } = schema.validate(req[source], {
             abortEarly: false,
             allowUnknown: false,
@@ -18,6 +19,11 @@ export const validate = (schema, source = 'body') => {
         });
 
         if (error) {
+            await cleanupUploadedCloudinaryFiles(req.files || req.file, {
+                route: req.originalUrl,
+                method: req.method,
+                reason: 'validation_failed',
+            });
             const errors = error.details.map((d) => d.message);
             return next(new BadRequestError('Validation failed', errors));
         }

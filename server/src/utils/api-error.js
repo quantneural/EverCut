@@ -80,6 +80,16 @@ export class ConflictError extends AppError {
 }
 
 // ---------------------------------------------------------------------------
+// 502 – Bad Gateway / Upstream dependency failure
+// ---------------------------------------------------------------------------
+
+export class ExternalServiceError extends AppError {
+    constructor(message = 'External service failure') {
+        super(message, 502);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // 429 – Too Many Requests
 // ---------------------------------------------------------------------------
 

@@ -2,6 +2,7 @@ import multer from 'multer';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import cloudinary from '../config/cloudinary.config.js';
 import config from '../config/index.js';
+import { BadRequestError } from '../utils/api-error.js';
 
 /**
  * All Multer upload configurations in one place.
@@ -16,7 +17,7 @@ const imageFilter = (_req, file, cb) => {
     if (config.upload.allowedMimeTypes.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.'), false);
+        cb(new BadRequestError('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.'), false);
     }
 };
 
