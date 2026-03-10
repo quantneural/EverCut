@@ -1,12 +1,14 @@
 import userRepository from '../repositories/user.repository.js';
 import customerProfileRepo from '../repositories/customer-profile.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
+import photoRepository from '../repositories/photo.repository.js';
+import { serializeBarberProfile } from '../utils/barber-profile.utils.js';
 import { ROLES } from '../utils/constants.js';
 
 /**
  * Auth service - handles session resolution after Firebase authentication.
  */
-export const createSession = async (firebaseUid, phoneNumber) => {
+export const createSession = async (firebaseUid, authContext = {}) => {
     const existingUser = await userRepository.findByFirebaseUid(firebaseUid);
 
     if (existingUser) {
@@ -17,7 +19,11 @@ export const createSession = async (firebaseUid, phoneNumber) => {
         if (existingUser.roleType === ROLES.CUSTOMER) {
             profile = await customerProfileRepo.findByUserId(existingUser._id);
         } else if (existingUser.roleType === ROLES.BARBER) {
-            profile = await shopRepository.findByOwnerId(existingUser._id);
+            const shop = await shopRepository.findByOwnerId(existingUser._id);
+            if (shop) {
+                const photos = await photoRepository.findByShopId(shop._id, {});
+                profile = serializeBarberProfile(shop, { photos });
+            }
         }
 
         return {
@@ -31,6 +37,7 @@ export const createSession = async (firebaseUid, phoneNumber) => {
     return {
         isNewUser: true,
         firebaseUid,
-        phoneNumber,
+        phoneNumber: authContext.phoneNumber,
+        email: authContext.email || null,
     };
 };

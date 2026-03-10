@@ -8,6 +8,7 @@ import {
     DAYS_OF_WEEK,
     ROLES,
 } from '../utils/constants.js';
+import { serializeBarberProfile } from '../utils/barber-profile.utils.js';
 import { ConflictError, BadRequestError } from '../utils/api-error.js';
 import { hashPin, validatePinCreation } from './pin.service.js';
 
@@ -105,10 +106,10 @@ const extractShopImages = (files) => {
 };
 
 const normalizeBarberOnboardingInput = (authUser, shopData) => {
-    const firstName = String(shopData.firstName || '').trim();
-    const lastName = String(shopData.lastName || '').trim();
+    const firstName = String(shopData.firstName || shopData.ownerFirstName || '').trim();
+    const lastName = String(shopData.lastName || shopData.ownerLastName || '').trim();
     const ownerNameFromNameParts = `${firstName} ${lastName}`.trim();
-    const ownerName = String(shopData.shopOwner || ownerNameFromNameParts).trim();
+    const ownerName = String(shopData.shopOwner || shopData.ownerName || ownerNameFromNameParts).trim();
 
     const emailId = String(shopData.emailId || shopData.email || '').trim().toLowerCase();
     const phoneNumber = String(shopData.phoneNumber || authUser?.phoneNumber || '').trim();
@@ -169,8 +170,14 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     if (!firstName || !lastName) {
         throw new BadRequestError('firstName and lastName are required');
     }
+    if (!shopData.gender && !shopData.ownerGender) {
+        throw new BadRequestError('gender is required');
+    }
+    if (!shopData.dateOfBirth && !shopData.ownerDateOfBirth) {
+        throw new BadRequestError('dateOfBirth is required');
+    }
     if (!ownerName) {
-        throw new BadRequestError('shopOwner or name fields are required');
+        throw new BadRequestError('shopOwner/ownerName or firstName + lastName are required');
     }
     if (!emailId) {
         throw new BadRequestError('email is required');
@@ -200,8 +207,8 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     return {
         firstName,
         lastName,
-        gender: shopData.gender,
-        dateOfBirth: shopData.dateOfBirth,
+        gender: shopData.gender || shopData.ownerGender,
+        dateOfBirth: shopData.dateOfBirth || shopData.ownerDateOfBirth,
         ownerName,
         shopName: String(shopData.shopName || '').trim(),
         category,
@@ -226,11 +233,35 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     };
 };
 
+const ensureUniqueUserIdentity = async ({ firebaseUid, email, phoneNumber }) => {
+    const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
+    const normalizedPhoneNumber = phoneNumber ? String(phoneNumber).trim() : null;
+
+    const [emailOwner, phoneOwner] = await Promise.all([
+        normalizedEmail ? userRepository.findByEmail(normalizedEmail) : null,
+        normalizedPhoneNumber ? userRepository.findByPhone(normalizedPhoneNumber) : null,
+    ]);
+
+    if (emailOwner && emailOwner.firebaseUid !== firebaseUid) {
+        throw new ConflictError('Email already registered');
+    }
+
+    if (phoneOwner && phoneOwner.firebaseUid !== firebaseUid) {
+        throw new ConflictError('Phone number already registered');
+    }
+};
+
 export const createCustomerOnboarding = async (firebaseUid, profileData, file) => {
     const existing = await userRepository.findByFirebaseUid(firebaseUid);
     if (existing) throw new ConflictError('User already exists');
 
     if (!file) throw new BadRequestError('Profile photo is required');
+
+    await ensureUniqueUserIdentity({
+        firebaseUid,
+        email: profileData.email,
+        phoneNumber: profileData.phoneNumber,
+    });
 
     let location = profileData.location;
     if (location && typeof location === 'string') {
@@ -268,6 +299,11 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
     if (existing) throw new ConflictError('Barber already exists');
 
     const normalized = normalizeBarberOnboardingInput(authUser, shopData);
+    await ensureUniqueUserIdentity({
+        firebaseUid,
+        email: normalized.emailId,
+        phoneNumber: normalized.phoneNumber,
+    });
 
     const onboardingImages = extractShopImages(files);
     if (onboardingImages.length !== 3) {
@@ -320,8 +356,6 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
         pinHash,
     });
 
-    const { pinHash: _pinHash, ...shop } = createdShop.toObject();
-
     const photos = [];
     for (const [index, file] of onboardingImages.entries()) {
         const photo = await photoRepository.create({
@@ -337,5 +371,9 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
         photos.push(photo);
     }
 
-    return { user, shop, photos };
+    return {
+        user,
+        shop: serializeBarberProfile(createdShop, { photos }),
+        photos,
+    };
 };

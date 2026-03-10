@@ -70,6 +70,7 @@ const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR, 'men', 'wom
 export const updateBusinessSchema = Joi.object({
     shopName: Joi.string().trim().min(1).max(100),
     ownerName: Joi.string().trim().min(1).max(100),
+    shopOwner: Joi.string().trim().min(1).max(100),
     ownerFirstName: Joi.string().trim().min(1).max(50),
     ownerLastName: Joi.string().trim().min(1).max(50),
     ownerGender: Joi.string().valid(...ALL_GENDERS),
@@ -78,6 +79,7 @@ export const updateBusinessSchema = Joi.object({
     lastName: Joi.string().trim().min(1).max(50),
     gender: Joi.string().valid(...ALL_GENDERS),
     dateOfBirth: Joi.date(),
+    phoneNumber: Joi.string(),
     numberOfEmployees: Joi.number().integer().min(1),
     yearsOfExperience: Joi.number().integer().min(0),
     email: Joi.string().email(),
@@ -121,6 +123,7 @@ export const updateBusinessSchema = Joi.object({
     ),
 })
     .custom((value) => {
+        value.ownerName = value.ownerName || value.shopOwner;
         value.ownerFirstName = value.ownerFirstName || value.firstName;
         value.ownerLastName = value.ownerLastName || value.lastName;
         value.ownerGender = value.ownerGender || value.gender;
@@ -154,6 +157,20 @@ export const updateBusinessSchema = Joi.object({
             value.closeTime = value.closeTime || value.closesAt;
         }
 
+        return value;
+    })
+    .min(1);
+
+export const updateUpiDetailsSchema = Joi.object({
+    upiId: Joi.string().trim(),
+    upiAddress: Joi.string().trim(),
+    accountHolderName: Joi.string().trim().min(1).max(100),
+    bankName: Joi.string().trim().min(1).max(120),
+    isVerified: Joi.any().strip(),
+    verificationStatus: Joi.any().strip(),
+})
+    .custom((value) => {
+        value.upiId = value.upiId || value.upiAddress;
         return value;
     })
     .min(1);

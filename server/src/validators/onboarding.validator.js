@@ -48,12 +48,17 @@ export const barberOnboardingSchema = Joi.object({
     phoneNumber: Joi.string(),
     email: Joi.string().email(),
     emailId: Joi.string().email(),
-    firstName: Joi.string().trim().min(1).max(50).required(),
-    lastName: Joi.string().trim().min(1).max(50).required(),
-    gender: Joi.string().valid(...ALL_GENDERS).required(),
-    dateOfBirth: Joi.date().required(),
+    firstName: Joi.string().trim().min(1).max(50),
+    lastName: Joi.string().trim().min(1).max(50),
+    ownerFirstName: Joi.string().trim().min(1).max(50),
+    ownerLastName: Joi.string().trim().min(1).max(50),
+    gender: Joi.string().valid(...ALL_GENDERS),
+    ownerGender: Joi.string().valid(...ALL_GENDERS),
+    dateOfBirth: Joi.date(),
+    ownerDateOfBirth: Joi.date(),
     shopName: Joi.string().trim().min(1).max(100).required(),
     shopOwner: Joi.string().trim().min(1).max(100),
+    ownerName: Joi.string().trim().min(1).max(100),
     shopCategory: Joi.string().valid(...ALL_SHOP_CATEGORIES),
     businessCategory: Joi.string().valid(...ALL_SHOP_CATEGORIES),
     category: Joi.string().valid(...ALL_SHOP_CATEGORIES),
@@ -93,6 +98,11 @@ export const barberOnboardingSchema = Joi.object({
     }),
 })
     .custom((value, helpers) => {
+        value.firstName = value.firstName || value.ownerFirstName;
+        value.lastName = value.lastName || value.ownerLastName;
+        value.gender = value.gender || value.ownerGender;
+        value.dateOfBirth = value.dateOfBirth || value.ownerDateOfBirth;
+        value.shopOwner = value.shopOwner || value.ownerName;
         value.shopCategory = value.shopCategory || value.businessCategory || value.category;
         value.emailId = value.emailId || value.email;
         value.upiId = value.upiId || value.upiAddress;
@@ -127,6 +137,16 @@ export const barberOnboardingSchema = Joi.object({
         if (!value.shopCategory) {
             return helpers.error('any.custom', {
                 message: 'shopCategory/businessCategory is required',
+            });
+        }
+        if (!value.firstName || !value.lastName) {
+            return helpers.error('any.custom', {
+                message: 'firstName and lastName are required',
+            });
+        }
+        if (!value.gender || !value.dateOfBirth) {
+            return helpers.error('any.custom', {
+                message: 'gender and dateOfBirth are required',
             });
         }
         if (!value.emailId) {

@@ -2,7 +2,9 @@ import shopRepository from '../repositories/shop.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import photoRepository from '../repositories/photo.repository.js';
 import ratingRepository from '../repositories/rating.repository.js';
-import { NotFoundError, BadRequestError } from '../utils/api-error.js';
+import userRepository from '../repositories/user.repository.js';
+import { BadRequestError, ConflictError, NotFoundError } from '../utils/api-error.js';
+import { serializeBarberProfile, serializeUpiDetails } from '../utils/barber-profile.utils.js';
 import {
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
@@ -20,12 +22,13 @@ export const getShopByOwner = async (ownerId) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
-    const { pinHash, ...safe } = shop.toObject();
-    return safe;
+    const photos = await photoRepository.findByShopId(shop._id, {});
+    return serializeBarberProfile(shop, { photos });
 };
 
 const ALLOWED_UPDATE_FIELDS = [
     'shopName',
+    'phoneNumber',
     'numberOfEmployees',
     'yearsOfExperience',
     'ownerName',
@@ -96,6 +99,7 @@ const normalizeBreakTimes = (value) => {
 const normalizeUpdateBody = (body = {}) => {
     const normalized = { ...body };
 
+    normalized.ownerName = normalized.ownerName || normalized.shopOwner;
     normalized.ownerFirstName = normalized.ownerFirstName || normalized.firstName;
     normalized.ownerLastName = normalized.ownerLastName || normalized.lastName;
     normalized.ownerGender = normalized.ownerGender || normalized.gender;
@@ -185,6 +189,16 @@ const validateAndAssign = (key, value, updateData, errors) => {
             return;
         }
 
+        case 'phoneNumber': {
+            const phoneNumber = String(value).trim();
+            if (!phoneNumber) {
+                errors.push('phoneNumber is required');
+                return;
+            }
+            updateData[key] = phoneNumber;
+            return;
+        }
+
         case 'availableDays': {
             try {
                 const days = parseArrayField(value, 'availableDays');
@@ -267,7 +281,8 @@ export const updateBusinessInfo = async (ownerId, body) => {
 
     for (const [key, value] of Object.entries(normalizedBody)) {
         if (!ALLOWED_UPDATE_FIELDS.includes(key)) continue;
-        if (value === undefined || value === null || value === '') continue;
+        if (value === undefined || value === null) continue;
+        if (typeof value === 'string' && value === '' && key !== 'bio') continue;
 
         validateAndAssign(key, value, updateData, errors);
     }
@@ -283,13 +298,47 @@ export const updateBusinessInfo = async (ownerId, body) => {
         throw new BadRequestError('No valid fields provided for update');
     }
 
+    if (updateData.emailId) {
+        const existingEmailUser = await userRepository.findByEmail(updateData.emailId);
+        if (existingEmailUser && String(existingEmailUser._id) !== String(ownerId)) {
+            throw new ConflictError('Email already registered');
+        }
+    }
+
+    if (updateData.phoneNumber) {
+        const existingPhoneUser = await userRepository.findByPhone(updateData.phoneNumber);
+        if (existingPhoneUser && String(existingPhoneUser._id) !== String(ownerId)) {
+            throw new ConflictError('Phone number already registered');
+        }
+    }
+
     const updated = await shopRepository.updateByOwnerId(ownerId, updateData);
-    const { pinHash, ...safe } = updated.toObject();
+    const userUpdates = {};
+    if (updateData.emailId) userUpdates.email = updateData.emailId;
+    if (updateData.phoneNumber) userUpdates.phoneNumber = updateData.phoneNumber;
+
+    if (Object.keys(userUpdates).length > 0) {
+        await userRepository.updateById(ownerId, userUpdates);
+    }
+
+    const photos = await photoRepository.findByShopId(updated._id, {});
 
     return {
-        shop: safe,
+        shop: serializeBarberProfile(updated, { photos }),
         updatedFields: Object.keys(updateData),
     };
+};
+
+export const getUpiDetails = async (ownerId) => {
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop profile');
+
+    return serializeUpiDetails(shop);
+};
+
+export const updateUpiDetails = async (ownerId, body) => {
+    const result = await updateBusinessInfo(ownerId, body);
+    return serializeUpiDetails(result.shop);
 };
 
 export const toggleShopStatus = async (ownerId, requestedStatus) => {
@@ -344,7 +393,12 @@ export const getShopInfoForCustomer = async (shopId) => {
         createdAt: rating.createdAt,
     }));
 
-    const { pinHash, ...safeShop } = shop.toObject();
+    const {
+        pinHash,
+        coverCloudinaryId,
+        ownerPhotoCloudinaryId,
+        ...safeShop
+    } = shop.toObject();
 
     return {
         shop: safeShop,

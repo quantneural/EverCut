@@ -6,13 +6,18 @@ import { ApiResponse } from '../utils/api-response.js';
  */
 export const createSession = async (req, res, next) => {
     try {
-        const { firebaseUid, phoneNumber } = req.user;
-        const result = await authService.createSession(firebaseUid, phoneNumber);
+        const { firebaseUid, phoneNumber, email } = req.user;
+        const result = await authService.createSession(firebaseUid, { phoneNumber, email });
 
         if (result.isNewUser) {
             return res.status(200).json(
                 ApiResponse.success(
-                    { isNewUser: true, firebaseUid: result.firebaseUid, phoneNumber: result.phoneNumber },
+                    {
+                        isNewUser: true,
+                        firebaseUid: result.firebaseUid,
+                        phoneNumber: result.phoneNumber,
+                        email: result.email,
+                    },
                     'New user. Please complete your profile.',
                 ),
             );
