@@ -12,21 +12,22 @@
 
 1. [Executive Summary](#executive-summary)
 2. [Platform Overviews](#platform-overviews)
-3. [Pricing Model Analysis](#pricing-model-analysis)
-4. [Hidden & Conditional Costs — Complete Reference](#hidden--conditional-costs--complete-reference)
-5. [Cost Simulations](#cost-simulations)
-6. [Infrastructure & Resource Limits](#infrastructure--resource-limits)
-7. [Integration & Developer Experience](#integration--developer-experience)
-8. [Scalability & Architecture](#scalability--architecture)
-9. [Performance & Reliability](#performance--reliability)
-10. [Security & Compliance](#security--compliance)
-11. [Developer Ecosystem](#developer-ecosystem)
-12. [Vendor Lock-In Risk](#vendor-lock-in-risk)
-13. [Pros & Cons Summary](#pros--cons-summary)
-14. [Comparative Analysis Tables](#comparative-analysis-tables)
-15. [Best Platform Recommendations](#best-platform-recommendations)
-16. [Best Subscription Plan Recommendations](#best-subscription-plan-recommendations)
-17. [Final Decision Matrix](#final-decision-matrix)
+3. [Billing Activation & Payment Method Requirements](#billing-activation--payment-method-requirements)
+4. [Pricing Model Analysis](#pricing-model-analysis)
+5. [Hidden & Conditional Costs — Complete Reference](#hidden--conditional-costs--complete-reference)
+6. [Cost Simulations](#cost-simulations)
+7. [Infrastructure & Resource Limits](#infrastructure--resource-limits)
+8. [Integration & Developer Experience](#integration--developer-experience)
+9. [Scalability & Architecture](#scalability--architecture)
+10. [Performance & Reliability](#performance--reliability)
+11. [Security & Compliance](#security--compliance)
+12. [Developer Ecosystem](#developer-ecosystem)
+13. [Vendor Lock-In Risk](#vendor-lock-in-risk)
+14. [Pros & Cons Summary](#pros--cons-summary)
+15. [Comparative Analysis Tables](#comparative-analysis-tables)
+16. [Best Platform Recommendations](#best-platform-recommendations)
+17. [Best Subscription Plan Recommendations](#best-subscription-plan-recommendations)
+18. [Final Decision Matrix](#final-decision-matrix)
 
 ---
 
@@ -70,6 +71,8 @@ This report evaluates six major object storage platforms — **Cloudflare R2**, 
 - Operates across Cloudflare's 330+ global PoPs
 - Delete, AbortMultipartUpload, and DeleteBucket operations are **free**
 - Unauthorized requests (HTTP 401) are **not billed**
+
+> ⚠️ **Billing Activation Requirement:** A valid credit card or PayPal account **must** be added to activate the R2 subscription before any bucket can be created — even to use the free tier. This is a hard prerequisite enforced at the point of enabling R2 in the Cloudflare dashboard. Cloudflare may perform preauthorization holds on the card at any time during a billing period to validate the payment method. If the payment method fails, access to R2 buckets is suspended; if not updated within 30 days, data may be deleted. **No spending cap exists** — only usage notification alerts are available. This is an important barrier for developers who want to quickly evaluate the service without a card on file.
 
 ---
 
@@ -119,6 +122,10 @@ This report evaluates six major object storage platforms — **Cloudflare R2**, 
 - Object Lock (WORM) immutability support
 - B2 Reserve: all-inclusive pricing (storage + egress + API calls + support) for annual commitments from 20 TB
 
+> ✅ **Billing Activation — No Credit Card Required (Private Buckets):** Backblaze B2 is the only major object storage provider that allows account creation and full API use with **no credit card required** — for private buckets. You can sign up with just an email address and immediately start uploading, managing, and retrieving data via the API. This is unique in the industry and a significant advantage for evaluation and prototyping.
+>
+> ⚠️ **Public Buckets Require Payment Verification:** If you create a **public bucket** for the first time, Backblaze requires either prior payment history on file OR adding a credit card and paying a small verification fee (credited to your account balance). Private buckets have no such requirement. This nuance is important: backend/API integrations using private buckets work entirely without a card; public-facing CDN or media hosting requires payment verification.
+
 ---
 
 ### 4. E2E Object Store (EOS)
@@ -145,6 +152,8 @@ This report evaluates six major object storage platforms — **Cloudflare R2**, 
 - Object Lock support
 - **No advertised free storage tier** — no free storage allocation for new accounts (trial credits available via sales contact)
 - **No separate per-request API charges** in standard plans
+
+> ⚠️ **Billing Activation Requirement:** E2E Networks requires payment validation during account creation. **Indian customers** can pay via credit/debit card (Visa, Mastercard, Amex via Razorpay), UPI, net banking, or e-wallets — making it highly accessible domestically. **International customers** must validate a credit/debit card via Stripe. International customers can temporarily skip verification for up to 20 days before account suspension. AutoPay setup requires a ₹1 verification charge (refunded within 14 working days). Indian customers with GST registration (organizations) must also provide GSTIN, PAN, and complete KYC. This is a more thorough onboarding process than most global providers.
 
 ---
 
@@ -196,20 +205,113 @@ This report evaluates six major object storage platforms — **Cloudflare R2**, 
 - Hybrid cloud leader — connects seamlessly with on-premises via Azure Arc
 - 11 nines durability
 
+> ⚠️ **Billing Activation Requirement:** Azure requires a valid **credit card or debit card** for all account types. Prepaid cards and virtual cards are **not accepted**. A **$1 USD** temporary authorization hold is placed on the card at signup (refunded shortly after verification). For Indian customers, Rupay debit cards are not supported; only international Visa/Mastercard/Amex cards work. **Azure for Students** provides an exception: verified students can access $100 in credits via their university email with no credit card required.
+
+---
+
+## Billing Activation & Payment Method Requirements
+
+This section documents exactly what is required to create an account and activate object storage on each platform — before any storage bucket can be created. This is frequently overlooked during vendor selection and can be a significant barrier for evaluation, onboarding, and automation.
+
+### Summary Table
+
+| Platform | Credit Card Required? | Accepted Payment Methods | Verification Charge | Notes |
+|---|---|---|---|---|
+| **Cloudflare R2** | ✅ Yes — mandatory | Credit card, PayPal | Preauthorization hold (no stated fixed amount; $5 charge reported by some users, possibly billing error) | **Must** add billing info before any R2 bucket can be created, even on the free tier. No spending cap — only notification alerts. |
+| **Amazon S3** | ✅ Yes — mandatory | Credit card, debit card | **$1 USD** (or ₹2 INR for AISPL) — real charge at signup | Required to create any AWS account. Free plan (6 months) and paid plan both require a card. Prepaid/virtual cards not accepted. |
+| **Backblaze B2** | ✅ Partial — only for public buckets | Credit card, debit card, ACH (bank transfer) | Small fee credited to account (for first public bucket creation) | **No credit card required** to sign up and use private buckets via API. Credit card/payment verification required only to create a first public bucket. |
+| **E2E EOS** | ✅ Yes — payment validation required | Credit/debit card (Razorpay/Stripe), UPI, net banking, e-wallets (Indian users); credit/debit card only (international) | ₹1 AutoPay verification (refunded within 14 working days) | Indian users have flexible payment options including UPI. International users must validate via Stripe. Skippable for 20 days; account suspended after if not completed. Indian organizations must provide GSTIN + PAN + KYC. |
+| **Google Cloud Storage** | ✅ Yes — mandatory | Credit card, debit card, bank account (region-dependent) | $0–$1 USD temporary authorization hold (refunded within days) | Required to start the GCS free trial and access GCS. $300 in free credits valid for 90 days. Prepaid cards generally unsupported. |
+| **Azure Blob Storage** | ✅ Yes — mandatory | Credit card, debit card, wire transfer (businesses only) | $1 USD temporary authorization hold (refunded shortly after) | Prepaid cards and virtual cards **not accepted**. RuPay (India) not supported. Exception: **Azure for Students** gives $100 credit with school email, no card required. |
+
+---
+
+### Platform-by-Platform Details
+
+#### Cloudflare R2 — Billing Activation Details
+
+Cloudflare R2 uses the term "R2 subscription" even though the free tier costs nothing. Before you can create your first bucket:
+
+1. Navigate to **Storage & Databases → R2 Object Storage** in the dashboard
+2. Click "Get Started" or "Purchase R2 Plan" (misleading label — the free plan is actually free)
+3. Add a credit card or PayPal account to complete activation
+
+Once activated, Cloudflare may perform a **preauthorization hold** on the card at any point during the billing period to confirm the payment method is valid for usage-based billing. If the hold fails, R2 access is suspended but data is retained for 30 days. The free tier limits (10 GB storage, 1M Class A ops, 10M Class B ops) still apply — nothing is charged if you stay within them. However, if you exceed limits, charges happen automatically with no cap, making notification alerts essential.
+
+> **Note on the $5 Charge:** Several community reports (including a March 2026 Cloudflare Community thread) describe a $5 charge appearing immediately after adding a payment method for R2. Cloudflare support confirmed these are billing anomalies or Workers Paid plan charges — R2 itself has no activation fee. If you see an unexpected $5 charge, contact Cloudflare billing support immediately. There is no documented $5 activation fee for R2 in official Cloudflare documentation.
+
+> **No Spending Cap:** Cloudflare currently offers no way to set a hard spending limit for R2. You can create usage-based alerts (billing notifications when thresholds are crossed), but nothing prevents charges from continuing beyond the alert threshold.
+
+---
+
+#### Amazon S3 — Billing Activation Details
+
+AWS requires a payment method at the account level — not the S3 level. There is no way to use any AWS service, including S3, without a payment method on file.
+
+- Credit cards and debit cards are accepted (Visa, Mastercard, Amex)
+- Prepaid cards and virtual credit cards are **not accepted**
+- A **$1 USD** verification charge (or ₹2 for Indian customers) is applied to the card at signup — this is a real transaction, not merely a hold
+- AWS Budgets allows setting cost alerts; billing alarms can be configured in CloudWatch
+- Free plan (6 months) and paid plan both require payment method
+
+#### Backblaze B2 — Billing Activation Details
+
+Backblaze B2 is the only platform in this review offering **no-credit-card-required** account creation and API access:
+
+- **Private buckets:** Full API access, upload, download, and management available with email signup only. No payment required.
+- **Public buckets:** Requires either (a) prior payment history or (b) adding a credit card and paying a small verification fee (credited to account balance). Backblaze confirms this in official developer documentation.
+- Accepted payment methods: credit card, debit card, ACH bank transfer
+- Billing alerts and caps can be configured in the dashboard
+
+This makes B2 uniquely suited for quick evaluations, CI/CD pipelines, and internal tooling — especially when procurement approval for credit card use is bureaucratically difficult.
+
+#### E2E Object Store — Billing Activation Details
+
+E2E Networks has a **tiered KYC and payment verification** process:
+
+- **Indian customers (organizations):** GSTIN, PAN, billing address, and payment validation required
+- **Indian customers (individuals):** PAN, Aadhaar, billing address, and payment validation required
+- **International customers:** Billing address, VAT/Tax ID (if applicable), and Stripe credit/debit card validation required
+- International users can **skip verification** for 20 days; account is suspended after 10 days of non-completion following reminders (day 4, 7, 9 post-signup)
+- AutoPay setup charges ₹1 for card verification, refunded within 14 working days
+- Indian users can pay via: UPI, net banking, credit/debit card, e-wallets (highly flexible)
+- Infra Credits (prepaid billing) must be purchased before resources can be launched
+
+#### Google Cloud Storage — Billing Activation Details
+
+GCS is accessed via a GCP billing account, not a standalone service account. To use GCS:
+
+1. Create a Google Cloud account
+2. Provide a payment method (credit/debit card or bank account in some regions)
+3. Receive $300 free trial credits, valid 90 days
+4. GCS Always Free tier (5 GB US storage, etc.) continues after trial — but the billing account must remain active
+
+Google performs a **$0–$1 authorization hold** (not an actual charge) to validate the card — this is typically released within a few days to a month. Debit cards are accepted in most regions; prepaid cards are generally not supported. The BigQuery Sandbox is available without a credit card, but it covers only BigQuery (not GCS).
+
+#### Azure Blob Storage — Billing Activation Details
+
+Azure's payment requirements are strict:
+- Credit card or debit card required — **no exceptions** for standard accounts
+- Prepaid cards and virtual cards are **not accepted**
+- Wire transfer available for business accounts (must be pre-approved for invoice billing)
+- $1 USD temporary authorization hold (refunded shortly after verification)
+- **Azure for Students:** Verified students with .edu email addresses can access $100 in credits over 12 months with **no credit card required** — accessed via the Azure Dev Tools for Teaching program
+- RuPay debit cards (India) are **not supported**; only international Visa/Mastercard/Amex accepted in India
+
 ---
 
 ## Pricing Model Analysis
 
 ### Free Tiers
 
-| Platform | Free Storage | Free Requests | Free Egress | Duration | Notes |
-|---|---|---|---|---|---|
-| **Cloudflare R2** | 10 GB/month | 1M Class A, 10M Class B/month | Unlimited (always free) | Permanent | No expiry — ongoing free tier; applies to Standard storage only |
-| **Amazon S3** | 5 GB (Standard) | 20K GET, 2K PUT/month | 15 GB/month | **6 months** (free plan) + $200 credits valid 12 months | **Updated July 2025:** New accounts receive up to $200 in credits usable across AWS services within 12 months; the free plan itself is available for 6 months post-signup |
-| **Backblaze B2** | 10 GB | 2,500 Class B & C calls/day free | 3× storage free | Permanent | Ongoing; no time limit |
-| **E2E EOS** | **None advertised** | Included in plans | Internal bandwidth free | Trial credits via sales | No self-serve free storage tier; contact sales for trial credits |
-| **Google Cloud Storage** | 5 GB (US regions) | Class A: 5K/month; Class B: 50K/month | 1 GB/month (North America) | Permanent (Always Free) | US multi-region only for free storage; Always Free caps are low |
-| **Azure Blob Storage** | 5 GB (LRS Hot) | 20K read/write | 15 GB/month | 12 months only | New accounts only; not permanent |
+| Platform | Free Storage | Free Requests | Free Egress | Duration | Payment Required? | Notes |
+|---|---|---|---|---|---|---|
+| **Cloudflare R2** | 10 GB/month | 1M Class A, 10M Class B/month | Unlimited (always free) | Permanent | ✅ **Yes** — credit card or PayPal mandatory before first bucket | No expiry — ongoing free tier; applies to Standard storage only |
+| **Amazon S3** | 5 GB (Standard) | 20K GET, 2K PUT/month | 15 GB/month | **6 months** (free plan) + $200 credits valid 12 months | ✅ **Yes** — credit/debit card mandatory; $1 verification charge | **Updated July 2025:** Free plan is 6 months; credits usable 12 months. No account without a payment method. |
+| **Backblaze B2** | 10 GB | 2,500 Class B & C calls/day free | 3× storage free | Permanent | ✅ **Partial** — No CC for private buckets; CC required for public buckets | Ongoing; no time limit. Unique in the industry: sign up with email only for private bucket API use. |
+| **E2E EOS** | **None advertised** | Included in plans | Internal bandwidth free | Trial credits via sales | ✅ **Yes** — payment validation required (UPI/cards for India; card only for international) | No self-serve free storage tier. Indian users have flexible payment options. |
+| **Google Cloud Storage** | 5 GB (US regions) | Class A: 5K/month; Class B: 50K/month | 1 GB/month (North America) | Permanent (Always Free) | ✅ **Yes** — credit/debit card mandatory; $0–$1 authorization hold | US multi-region only for free storage. $300 free credits for 90 days at signup. |
+| **Azure Blob Storage** | 5 GB (LRS Hot) | 20K read/write | 15 GB/month | 12 months only | ✅ **Yes** — credit/debit card mandatory; $1 hold. No prepaid/virtual cards. | New accounts only; not permanent. Exception: Azure for Students (no CC, school email). |
 
 > **Note:** Cloudflare R2's permanent free tier with unlimited egress is the most generous in the industry. For small projects under 10 GB with moderate request volumes, R2 is effectively **free forever**.
 
@@ -683,13 +785,14 @@ The following scenarios use realistic assumptions for a web application or data 
 | ✅ Pros | ❌ Cons |
 |---|---|
 | Zero egress fees globally — the industry differentiator | Newer platform — less mature than S3/GCS/Azure |
-| Generous permanent free tier (10 GB + unlimited egress) | No archival storage class (only Standard + Infrequent Access) |
-| S3-compatible API — minimal migration effort | Fewer storage regions vs AWS/GCS/Azure |
-| Distributed across 330+ global PoPs | FedRAMP not available (not suitable for US government) |
-| Native Workers integration for edge computing | Smaller third-party ecosystem vs AWS |
-| Delete, AbortMultipartUpload operations are free | R2 Infrequent Access has 30-day minimum |
-| Data Catalog (Iceberg) beta currently free | Data Catalog pricing TBD; 30 days' notice before charges |
-| Super Slurper and Sippy migration tools are free | Rounding policy (up to next billing unit) can slightly inflate small bills |
+| Generous permanent free tier (10 GB + unlimited egress) | **Credit card or PayPal mandatory to activate** — even the free tier requires billing info before any bucket can be created |
+| S3-compatible API — minimal migration effort | No archival storage class (only Standard + Infrequent Access) |
+| Distributed across 330+ global PoPs | Fewer storage regions vs AWS/GCS/Azure |
+| Native Workers integration for edge computing | FedRAMP not available (not suitable for US government) |
+| Delete, AbortMultipartUpload operations are free | Smaller third-party ecosystem vs AWS |
+| Data Catalog (Iceberg) beta currently free | R2 Infrequent Access has 30-day minimum |
+| Super Slurper and Sippy migration tools are free | **No spending cap** — only notification alerts; unexpected bills are possible if limits are exceeded |
+| | Rounding policy (up to next billing unit) can slightly inflate small bills |
 
 ### Amazon S3
 
@@ -715,7 +818,9 @@ The following scenarios use realistic assumptions for a web application or data 
 | Transparent, simple pricing | No archival/cold storage tier |
 | Object Lock (WORM) support | No native serverless compute integration |
 | Unlimited free egress via named CDN/compute partners | Class B/C API overage can add up for high-request workloads |
+| **No credit card required for private bucket access** — unique industry advantage | **Public buckets require payment verification** — credit card or prior payment history needed |
 | B2 Reserve: all-inclusive pricing with no hidden charges | B2 Reserve purchased through resellers only |
+| Billing alerts and caps configurable in dashboard | |
 
 ### E2E Object Store (EOS)
 
@@ -795,6 +900,7 @@ The following scenarios use realistic assumptions for a web application or data 
 | No Min Storage Duration | ✅ (Standard) | ✅ (Standard) | ✅ (all) | ✅ | ✅ (Standard) | ✅ (Hot) |
 | Instant Archive Access | N/A | ✅ (Glacier Instant only) | N/A | N/A | ✅ (all tiers) | ❌ (up to 15 hrs) |
 | Self-Service Free Tier | ✅ Permanent | ✅ (6 months + $200 credits) | ✅ Permanent | ❌ | ✅ Permanent (limited) | ✅ (12 months only) |
+| **No Credit Card to Start** | ❌ Card required | ❌ Card required | ✅ **Private buckets only** | ❌ Card/payment required | ❌ Card required | ❌ Card required |
 
 ---
 
@@ -841,11 +947,13 @@ The following scenarios use realistic assumptions for a web application or data 
 ## Best Platform Recommendations
 
 ### Best for Small Projects
-**🥇 Cloudflare R2** or **Backblaze B2**
+**🥇 Backblaze B2** (if no credit card available) or **Cloudflare R2** (if credit card is available and egress is high)
 
-Cloudflare R2 is the best choice for small projects that need a permanent free tier with zero egress costs. The 10 GB free storage + 1M Class A operations + unlimited egress means a small static site or personal project can run indefinitely at **$0/month**. Backblaze B2 is a close second with 10 GB free and the cheapest paid tier at $0.006/GB.
+Backblaze B2 is the only platform in this review that allows full API access with **no credit card required** — making it uniquely accessible for quick evaluations, student projects, or scenarios where procurement approval is needed before a card can be added. Private buckets work entirely without a payment method; only public bucket creation requires payment verification.
 
-**Why not AWS/GCS/Azure?** AWS's free plan now lasts only 6 months (updated July 2025). GCS always-free limits are low. Azure free tier expires after 12 months. Real-world costs (especially egress) become significant even at small scale.
+Cloudflare R2 offers the best permanent free tier (10 GB, unlimited egress, permanent) but **requires a credit card or PayPal to activate** — even the free tier. Once the billing hurdle is cleared, R2 is effectively free for small projects indefinitely. Backblaze B2 is a very close second with 10 GB free and the cheapest paid tier at $0.006/GB.
+
+**Why not AWS/GCS/Azure?** AWS's free plan now lasts only 6 months (updated July 2025). GCS always-free limits are low. Azure free tier expires after 12 months. Real-world costs (especially egress) become significant even at small scale. All three require credit cards.
 
 ---
 
@@ -984,6 +1092,8 @@ Each platform is scored out of 10 across seven dimensions. Scores reflect suitab
 **9. Watch versioning and Intelligent-Tiering monitoring fees.** Enabling S3 versioning without lifecycle rules silently doubles or triples storage costs. S3 Intelligent-Tiering's $0.0025/1,000 objects monitoring fee can exceed savings for buckets with millions of small objects.
 
 **10. Build on S3-compatible APIs from day one.** Cloudflare R2, Backblaze B2, and E2E EOS all offer full S3 API compatibility. Designing your application against the S3 API spec — rather than proprietary GCS or Azure SDKs — preserves maximum portability and migration optionality.
+
+**11. Billing activation barriers matter for developer onboarding.** Only Backblaze B2 allows complete API access with no credit card required (for private buckets). Cloudflare R2, AWS S3, GCS, and Azure all require a payment method before any storage resource can be created. This is a practical barrier for quick evaluations, student projects, and teams awaiting procurement approval. If frictionless onboarding is a priority, B2 is uniquely positioned. Contrast this with services like Cloudinary, which allow full free-tier access with just an email address — no payment method needed at any point.
 
 ---
 
