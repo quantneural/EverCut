@@ -246,7 +246,12 @@ export const getCustomerBookings = async (customerId, type) => {
 
 // ── Customer: toggle favorite ────────────────────────────────────────────
 
-export const addToFavorites = async (customerId, bookingId) => {
+export const toggleFavorite = async (customerId, bookingId) => {
+    const profile = await customerProfileRepo.findByUserId(customerId);
+    const isFavorited = profile.favoriteBookings.some(id => id.toString() === bookingId);
+    if (isFavorited) {
+        return customerProfileRepo.removeFavoriteBooking(customerId, bookingId);
+    }
     return customerProfileRepo.addFavoriteBooking(customerId, bookingId);
 };
 

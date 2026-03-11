@@ -60,7 +60,7 @@ export const reorderBooking = async (req, res, next) => {
 
 export const toggleFavorite = async (req, res, next) => {
     try {
-        const result = await bookingService.addToFavorites(req.user._id, req.params.id);
+        const result = await bookingService.toggleFavorite(req.user._id, req.params.id);
         return res.status(200).json(ApiResponse.success(result, 'Favorite updated'));
     } catch (err) {
         next(err);

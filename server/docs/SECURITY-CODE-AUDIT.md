@@ -271,7 +271,11 @@ const employee = await employeeRepository.claimSlot(employeeId, date, time);
 
 ---
 
-### 4.3 🟠 HIGH — `addToFavorites` Always Adds, Never Toggles
+### 4.3 ✅ ~~HIGH — `addToFavorites` Always Adds, Never Toggles~~ **[FIXED]**
+
+> **Status:** ✅ Resolved  
+> **Fixed on:** March 11, 2026  
+> **Fix:** Updated `toggleFavorite` logic in `booking.service.js` to correctly toggle the favorite status by checking if the booking is already favorited and adjusting accordingly. Also updated the controller to call `toggleFavorite`.
 
 **File:** `src/services/booking.service.js` — Lines 237–239
 
