@@ -2,6 +2,7 @@ import serviceRepository from '../repositories/service.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import cloudinary from '../config/cloudinary.config.js';
 import { NotFoundError, ConflictError } from '../utils/api-error.js';
+import { escapeRegex } from '../utils/regex.utils.js';
 
 /**
  * Service-catalog service — manages the salon services (haircut, etc.)
@@ -76,13 +77,13 @@ export const deleteService = async (ownerId, serviceId) => {
 
 export const searchServices = async (query, gender) => {
     const filters = {};
-    if (gender) filters.serviceFor = { $regex: new RegExp(`^${gender}$`, 'i') };
+    if (gender) filters.serviceFor = { $regex: new RegExp(`^${escapeRegex(gender)}$`, 'i') };
     return serviceRepository.searchByName(query, filters, 'serviceName serviceFor shopId');
 };
 
 export const searchShops = async (query) => {
     const Shop = (await import('../models/shop.model.js')).default;
-    return Shop.find({ shopName: { $regex: query, $options: 'i' } })
+    return Shop.find({ shopName: { $regex: new RegExp(escapeRegex(query), 'i') } })
         .select('shopName address location phoneNumber category coverUrl');
 };
 

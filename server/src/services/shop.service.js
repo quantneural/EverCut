@@ -5,6 +5,7 @@ import ratingRepository from '../repositories/rating.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import { BadRequestError, ConflictError, NotFoundError } from '../utils/api-error.js';
 import { serializeBarberProfile, serializeUpiDetails } from '../utils/barber-profile.utils.js';
+import { escapeRegex } from '../utils/regex.utils.js';
 import {
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
@@ -433,8 +434,8 @@ export const getNearbyServicesByGender = async (coordinates, gender, searchTerm)
     if (!nearbyShops.length) return { shops: [], services: [] };
 
     const shopIds = nearbyShops.map((shop) => shop._id);
-    const serviceFilter = { serviceFor: { $regex: new RegExp(`^${gender}$`, 'i') } };
-    if (searchTerm) serviceFilter.serviceName = { $regex: searchTerm, $options: 'i' };
+    const serviceFilter = { serviceFor: { $regex: new RegExp(`^${escapeRegex(gender)}$`, 'i') } };
+    if (searchTerm) serviceFilter.serviceName = { $regex: new RegExp(escapeRegex(searchTerm), 'i') };
 
     const services = await serviceRepository.findByShopIds(
         shopIds,

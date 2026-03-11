@@ -1,4 +1,5 @@
 import Service from '../models/service.model.js';
+import { escapeRegex } from '../utils/regex.utils.js';
 
 class ServiceRepository {
     async create(data) {
@@ -29,7 +30,7 @@ class ServiceRepository {
     async findByShopIdAndName(shopId, serviceName) {
         return Service.findOne({
             shopId,
-            serviceName: { $regex: new RegExp(`^${serviceName}$`, 'i') },
+            serviceName: { $regex: new RegExp(`^${escapeRegex(serviceName)}$`, 'i') },
             isActive: true,
         });
     }
@@ -42,7 +43,7 @@ class ServiceRepository {
 
     async searchByName(nameQuery, filters = {}, selectFields) {
         const query = Service.find({
-            serviceName: { $regex: nameQuery, $options: 'i' },
+            serviceName: { $regex: new RegExp(escapeRegex(nameQuery), 'i') },
             isActive: true,
             ...filters,
         });

@@ -62,7 +62,11 @@ However, the audit uncovered **several security vulnerabilities and bugs** that 
 
 ## 3. Critical Issues
 
-### 3.1 🔴 CRITICAL — ReDoS Vulnerability via Unsanitized User Input in Regex
+### 3.1 ✅ ~~CRITICAL — ReDoS Vulnerability via Unsanitized User Input in Regex~~ **[FIXED]**
+
+> **Status:** ✅ Resolved  
+> **Fixed on:** March 11, 2026  
+> **Fix:** Created `src/utils/regex.utils.js` with an `escapeRegex()` utility. All user-supplied strings (`gender`, `searchTerm`, `query`, `serviceName`) are now escaped via `escapeRegex()` before being interpolated into `RegExp` constructors across `shop.service.js`, `service-catalog.service.js`, and `service.repository.js`.
 
 **Files:**
 - `src/services/shop.service.js` — Line 382
