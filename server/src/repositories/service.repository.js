@@ -10,8 +10,8 @@ class ServiceRepository {
         return Service.findById(id);
     }
 
-    async findByIds(ids, selectFields) {
-        const query = Service.find({ _id: { $in: ids }, isActive: true });
+    async findByIds(ids, selectFields, options = {}) {
+        const query = Service.find({ _id: { $in: ids }, isActive: true }).session(options.session || null);
         if (selectFields) query.select(selectFields);
         return query.lean();
     }

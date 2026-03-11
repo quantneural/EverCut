@@ -186,7 +186,7 @@ export const reorderBooking = async (customerId, bookingId, newDate, newTime) =>
     session.startTransaction();
 
     try {
-        const existing = await bookingRepository.findById(bookingId);
+        const existing = await bookingRepository.findById(bookingId, { session });
         if (!existing) { await session.abortTransaction(); session.endSession(); throw new NotFoundError('Original booking'); }
 
         // Prevent same date/time
@@ -200,10 +200,10 @@ export const reorderBooking = async (customerId, bookingId, newDate, newTime) =>
             throw new BadRequestError('Cannot book for a past date/time');
         }
 
-        const services = await serviceRepository.findByIds(existing.serviceIds, 'serviceName finalPrice');
+        const services = await serviceRepository.findByIds(existing.serviceIds, 'serviceName finalPrice', { session });
         const totalAmount = services.reduce((sum, s) => sum + (s.finalPrice || 0), 0);
 
-        const employee = await employeeRepository.claimSlot(existing.employeeId, newDate, newTime, customerId, existing.serviceIds);
+        const employee = await employeeRepository.claimSlot(existing.employeeId, newDate, newTime, customerId, existing.serviceIds, { session });
         if (!employee) { await session.abortTransaction(); session.endSession(); throw new BadRequestError('Employee not available'); }
 
         const newBooking = await bookingRepository.create({
@@ -215,7 +215,7 @@ export const reorderBooking = async (customerId, bookingId, newDate, newTime) =>
             time: newTime,
             totalAmount,
             status: BOOKING_STATUS.CONFIRMED,
-        });
+        }, { session });
 
         await session.commitTransaction();
         session.endSession();
@@ -283,12 +283,23 @@ export const updateBooking = async (bookingId, customerId, { employeeId, date, t
         throw new ForbiddenError('You can only update your own bookings');
     }
 
-    const employee = await employeeRepository.claimSlot(employeeId, date, time);
-    if (!employee) throw new BadRequestError('Employee not available at this date/time');
+    const oldDate = booking.date.toISOString().split('T')[0];
+    const isSameSlot = booking.employeeId.toString() === employeeId
+        && oldDate === new Date(date).toISOString().split('T')[0]
+        && booking.time === time;
 
-    // Release old slot if employee changed
-    if (booking.employeeId.toString() !== employeeId) {
-        await employeeRepository.releaseSlot(booking.employeeId, booking.date.toISOString().split('T')[0], booking.time);
+    // Nothing to update if the slot hasn't changed
+    if (isSameSlot) return booking;
+
+    // Release the old slot first (always, regardless of employee change)
+    await employeeRepository.releaseSlot(booking.employeeId, oldDate, booking.time);
+
+    // Claim the new slot
+    const employee = await employeeRepository.claimSlot(employeeId, date, time);
+    if (!employee) {
+        // Restore the old slot if the new claim fails
+        await employeeRepository.claimSlot(booking.employeeId, oldDate, booking.time);
+        throw new BadRequestError('Employee not available at this date/time');
     }
 
     booking.employeeId = employeeId;

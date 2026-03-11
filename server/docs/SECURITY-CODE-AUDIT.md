@@ -184,7 +184,11 @@ export const updateBookingStatus = async (bookingId, status, ownerId) => {
 
 ---
 
-### 3.4 🔴 CRITICAL — Transaction Not Used for DB Operations in `reorderBooking`
+### 3.4 ✅ ~~CRITICAL — Transaction Not Used for DB Operations in `reorderBooking`~~ **[FIXED]**
+
+> **Status:** ✅ Resolved  
+> **Fixed on:** March 11, 2026  
+> **Fix:** Added optional `options` parameter (supporting `{ session }`) to `bookingRepository.create()`, `bookingRepository.findById()`, `employeeRepository.claimSlot()`, and `serviceRepository.findByIds()`. Updated `reorderBooking` in `booking.service.js` to pass `{ session }` to all four DB operations within the transaction, ensuring atomicity. `Booking.create()` uses the array syntax `Booking.create([data], options)` as required by Mongoose for session-aware creation.
 
 **File:** `src/services/booking.service.js` — Lines 172–217
 
@@ -217,7 +221,11 @@ async create(data, options = {}) {
 
 ## 4. High-Severity Issues
 
-### 4.1 🟠 HIGH — `updateBooking` Doesn't Release Old Slot When Same Employee Changes Time
+### 4.1 ✅ ~~HIGH — `updateBooking` Doesn't Release Old Slot When Same Employee Changes Time~~ **[FIXED]**
+
+> **Status:** ✅ Resolved  
+> **Fixed on:** March 11, 2026  
+> **Fix:** Refactored `updateBooking` in `booking.service.js` to always release the old slot before claiming the new one, regardless of whether the employee changed. Added a short-circuit for the no-change case and a rollback mechanism that restores the old slot if the new `claimSlot` call fails.
 
 **File:** `src/services/booking.service.js` — Lines 262–280
 
@@ -248,7 +256,11 @@ const employee = await employeeRepository.claimSlot(employeeId, date, time);
 
 ---
 
-### 4.2 🟠 HIGH — Booking Deletion Doesn't Verify Shop Ownership
+### 4.2 ✅ ~~HIGH — Booking Deletion Doesn't Verify Shop Ownership~~ **[FIXED]**
+
+> **Status:** ✅ Resolved  
+> **Fixed on:** March 11, 2026  
+> **Fix:** Already resolved as part of Issue 3.3. The `deleteBookingAfterPayment` function now verifies that the requesting barber owns the shop the booking belongs to before proceeding, using `shopRepository.findByOwnerId()` and a `ForbiddenError` guard.
 
 **File:** `src/services/booking.service.js` — Lines 356–364
 

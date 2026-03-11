@@ -1,12 +1,16 @@
 import Booking from '../models/booking.model.js';
 
 class BookingRepository {
-    async create(data) {
+    async create(data, options = {}) {
+        if (options.session) {
+            const [doc] = await Booking.create([data], options);
+            return doc;
+        }
         return Booking.create(data);
     }
 
-    async findById(id) {
-        return Booking.findById(id);
+    async findById(id, options = {}) {
+        return Booking.findById(id).session(options.session || null);
     }
 
     async findByIdPopulated(id) {
