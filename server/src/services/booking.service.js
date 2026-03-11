@@ -4,7 +4,7 @@ import employeeRepository from '../repositories/employee.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import customerProfileRepo from '../repositories/customer-profile.repository.js';
-import { NotFoundError, BadRequestError } from '../utils/api-error.js';
+import { NotFoundError, BadRequestError, ForbiddenError } from '../utils/api-error.js';
 import { isBookingInFuture, isWithinShopHours, getDayOfWeek, isWithinCancellationWindow } from '../utils/time.utils.js';
 import { BOOKING_STATUS, MAX_RESCHEDULE_COUNT, CANCELLATION_WINDOW_HOURS } from '../utils/constants.js';
 
@@ -79,9 +79,13 @@ export const bookSalon = async (customerId, data) => {
 
 // ── Customer: get booking details ────────────────────────────────────────
 
-export const getBookingDetails = async (bookingId) => {
+export const getBookingDetails = async (bookingId, customerId) => {
     const booking = await bookingRepository.findByIdPopulated(bookingId);
     if (!booking) throw new NotFoundError('Booking');
+
+    if ((booking.customerId._id || booking.customerId).toString() !== customerId.toString()) {
+        throw new ForbiddenError('You can only access your own bookings');
+    }
 
     const services = await serviceRepository.findByIds(booking.serviceIds, 'serviceName finalPrice imageUrl serviceType');
     const totalAmount = services.reduce((sum, s) => sum + (s.finalPrice || 0), 0);
@@ -103,9 +107,13 @@ export const getBookingDetails = async (bookingId) => {
 
 // ── Customer: cancel booking ─────────────────────────────────────────────
 
-export const cancelBooking = async (bookingId) => {
+export const cancelBooking = async (bookingId, customerId) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
+
+    if ((booking.customerId._id || booking.customerId).toString() !== customerId.toString()) {
+        throw new ForbiddenError('You can only cancel your own bookings');
+    }
 
     if (booking.status === 'cancelled') throw new BadRequestError('Booking is already cancelled');
     if (booking.status === 'completed') throw new BadRequestError('Cannot cancel a completed booking');
@@ -128,9 +136,13 @@ export const cancelBooking = async (bookingId) => {
 
 // ── Customer: reschedule booking ─────────────────────────────────────────
 
-export const rescheduleBooking = async (bookingId, newDate, newTime) => {
+export const rescheduleBooking = async (bookingId, customerId, newDate, newTime) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
+
+    if ((booking.customerId._id || booking.customerId).toString() !== customerId.toString()) {
+        throw new ForbiddenError('You can only reschedule your own bookings');
+    }
 
     if (!isBookingInFuture(booking.date.toISOString().split('T')[0], booking.time)) {
         throw new BadRequestError('Appointment has already passed');
@@ -240,9 +252,13 @@ export const addToFavorites = async (customerId, bookingId) => {
 
 // ── Customer: booking confirmation ───────────────────────────────────────
 
-export const getBookingConfirmation = async (bookingId) => {
+export const getBookingConfirmation = async (bookingId, customerId) => {
     const booking = await bookingRepository.findByIdPopulated(bookingId);
     if (!booking) throw new NotFoundError('Booking');
+
+    if ((booking.customerId._id || booking.customerId).toString() !== customerId.toString()) {
+        throw new ForbiddenError('You can only access your own bookings');
+    }
 
     const services = await serviceRepository.findByIds(booking.serviceIds, 'serviceName finalPrice');
     const totalAmount = services.reduce((sum, s) => sum + (s.finalPrice || 0), 0);
@@ -259,9 +275,13 @@ export const getBookingConfirmation = async (bookingId) => {
 
 // ── Customer: update booking ─────────────────────────────────────────────
 
-export const updateBooking = async (bookingId, { employeeId, date, time }) => {
+export const updateBooking = async (bookingId, customerId, { employeeId, date, time }) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
+
+    if ((booking.customerId._id || booking.customerId).toString() !== customerId.toString()) {
+        throw new ForbiddenError('You can only update your own bookings');
+    }
 
     const employee = await employeeRepository.claimSlot(employeeId, date, time);
     if (!employee) throw new BadRequestError('Employee not available at this date/time');
@@ -281,9 +301,13 @@ export const updateBooking = async (bookingId, { employeeId, date, time }) => {
 
 // ── Customer: delete service from booking ────────────────────────────────
 
-export const deleteServiceFromBooking = async (bookingId, serviceId) => {
+export const deleteServiceFromBooking = async (bookingId, customerId, serviceId) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
+
+    if ((booking.customerId._id || booking.customerId).toString() !== customerId.toString()) {
+        throw new ForbiddenError('You can only retrieve from your own bookings');
+    }
 
     booking.serviceIds = booking.serviceIds.filter((id) => id.toString() !== serviceId);
 

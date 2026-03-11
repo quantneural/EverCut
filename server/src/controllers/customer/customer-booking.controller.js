@@ -22,7 +22,7 @@ export const getBookings = async (req, res, next) => {
 
 export const getBookingDetails = async (req, res, next) => {
     try {
-        const result = await bookingService.getBookingDetails(req.params.id);
+        const result = await bookingService.getBookingDetails(req.params.id, req.user._id);
         return res.status(200).json(ApiResponse.success(result, 'Booking details fetched'));
     } catch (err) {
         next(err);
@@ -31,7 +31,7 @@ export const getBookingDetails = async (req, res, next) => {
 
 export const cancelBooking = async (req, res, next) => {
     try {
-        const result = await bookingService.cancelBooking(req.params.id);
+        const result = await bookingService.cancelBooking(req.params.id, req.user._id);
         return res.status(200).json(ApiResponse.success(result, 'Booking cancelled'));
     } catch (err) {
         next(err);
@@ -41,7 +41,7 @@ export const cancelBooking = async (req, res, next) => {
 export const rescheduleBooking = async (req, res, next) => {
     try {
         const { newDate, newTime } = req.body;
-        const result = await bookingService.rescheduleBooking(req.params.id, newDate, newTime);
+        const result = await bookingService.rescheduleBooking(req.params.id, req.user._id, newDate, newTime);
         return res.status(200).json(ApiResponse.success(result, 'Booking rescheduled'));
     } catch (err) {
         next(err);
@@ -69,7 +69,7 @@ export const toggleFavorite = async (req, res, next) => {
 
 export const getBookingConfirmation = async (req, res, next) => {
     try {
-        const result = await bookingService.getBookingConfirmation(req.params.id);
+        const result = await bookingService.getBookingConfirmation(req.params.id, req.user._id);
         return res.status(200).json(ApiResponse.success(result, 'Confirmation fetched'));
     } catch (err) {
         next(err);
@@ -78,7 +78,7 @@ export const getBookingConfirmation = async (req, res, next) => {
 
 export const updateBooking = async (req, res, next) => {
     try {
-        const result = await bookingService.updateBooking(req.params.id, req.body);
+        const result = await bookingService.updateBooking(req.params.id, req.user._id, req.body);
         return res.status(200).json(ApiResponse.success(result, 'Booking updated'));
     } catch (err) {
         next(err);
@@ -87,7 +87,7 @@ export const updateBooking = async (req, res, next) => {
 
 export const deleteServiceFromBooking = async (req, res, next) => {
     try {
-        const result = await bookingService.deleteServiceFromBooking(req.params.id, req.params.serviceId);
+        const result = await bookingService.deleteServiceFromBooking(req.params.id, req.user._id, req.params.serviceId);
         return res.status(200).json(ApiResponse.success(result, 'Service removed from booking'));
     } catch (err) {
         next(err);

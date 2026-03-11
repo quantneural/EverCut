@@ -106,7 +106,11 @@ const serviceFilter = { serviceFor: new RegExp(`^${escapeRegex(gender)}$`, 'i') 
 
 ---
 
-### 3.2 🔴 CRITICAL — Missing Ownership Verification on Customer Booking Operations (IDOR)
+### 3.2 ✅ ~~CRITICAL — Missing Ownership Verification on Customer Booking Operations (IDOR)~~ **[FIXED]**
+
+> **Status:** ✅ Resolved  
+> **Fixed on:** March 11, 2026  
+> **Fix:** Passed `req.user._id` from the customer booking controller to the `bookingService` and added ownership verification checks using `ForbiddenError` to ensure customers can only access, modify, or delete their own bookings.
 
 **Files:**
 - `src/controllers/customer/customer-booking.controller.js` — Lines 23–29, 32–38, 41–48, 70–76, 79–85, 88–94
