@@ -145,7 +145,11 @@ Apply this pattern to: `cancelBooking`, `rescheduleBooking`, `getBookingConfirma
 
 ---
 
-### 3.3 🔴 CRITICAL — Missing Ownership Verification on Barber Booking Operations (IDOR)
+### 3.3 ✅ ~~CRITICAL — Missing Ownership Verification on Barber Booking Operations (IDOR)~~ **[FIXED]**
+
+> **Status:** ✅ Resolved  
+> **Fixed on:** March 11, 2026  
+> **Fix:** In `barber-booking.controller.js`, added `req.user._id` to `updateBookingStatus` and `deleteBooking` requests. Enhanced the corresponding `booking.service.js` methods to check that the barber owns the shop related to the booking, using `ForbiddenError` to block unauthorized access.
 
 **Files:**
 - `src/controllers/barber/barber-booking.controller.js` — Lines 22–29, 32–38

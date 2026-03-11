@@ -369,17 +369,33 @@ export const getBookingsByShop = async (ownerId) => {
     return { bookings, numberOfEmployees: employeeIds.length, numberOfCustomers: numCustomers };
 };
 
-export const updateBookingStatus = async (bookingId, status) => {
+export const updateBookingStatus = async (bookingId, status, ownerId) => {
     const allowed = ['cancelled', 'completed', 'confirmed'];
     if (!allowed.includes(status)) throw new BadRequestError(`Invalid status. Allowed: ${allowed.join(', ')}`);
+
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop');
+
+    const booking = await bookingRepository.findById(bookingId);
+    if (!booking || booking.shopId.toString() !== shop._id.toString()) {
+        throw new ForbiddenError('You can only manage bookings for your own shop');
+    }
+
     const updated = await bookingRepository.updateStatus(bookingId, status);
     if (!updated) throw new NotFoundError('Booking');
     return updated;
 };
 
-export const deleteBookingAfterPayment = async (bookingId) => {
+export const deleteBookingAfterPayment = async (bookingId, ownerId) => {
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop');
+
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
+    if (booking.shopId.toString() !== shop._id.toString()) {
+        throw new ForbiddenError('You can only manage bookings for your own shop');
+    }
+
     if (booking.paymentStatus !== 'success') throw new BadRequestError('Cannot delete unpaid booking');
 
     await employeeRepository.releaseSlot(booking.employeeId, booking.date.toISOString().split('T')[0], booking.time);
