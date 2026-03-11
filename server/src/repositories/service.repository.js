@@ -51,6 +51,12 @@ class ServiceRepository {
         return query.populate('shopId', 'shopName address location phoneNumber category coverUrl').lean();
     }
 
+    async findByGender(gender, selectFields) {
+        const query = Service.find({ serviceFor: gender, isActive: true });
+        if (selectFields) query.select(selectFields);
+        return query.lean();
+    }
+
     async updateById(id, shopId, data) {
         return Service.findOneAndUpdate(
             { _id: id, shopId },

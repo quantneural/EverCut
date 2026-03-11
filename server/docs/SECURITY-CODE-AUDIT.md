@@ -302,7 +302,11 @@ export const toggleFavorite = async (customerId, bookingId) => {
 
 ## 5. Medium-Severity Issues
 
-### 5.1 🟡 MEDIUM — `searchShops` Bypasses Repository Layer
+### 5.1 ✅ ~~MEDIUM — `searchShops` Bypasses Repository Layer~~ **[FIXED]**
+
+> **Status:** ✅ Resolved  
+> **Fixed on:** March 11, 2026  
+> **Fix:** Updated `searchShops` and `getServicesByGender` in `service-catalog.service.js` to rely on robust repository methods (`shopRepository.searchByName` and `serviceRepository.findByGender`) instead of dynamic model imports and direct DB queries.
 
 **File:** `src/services/service-catalog.service.js` — Lines 83–87
 

@@ -1,5 +1,6 @@
 import Shop from '../models/shop.model.js';
 import { NEARBY_DISTANCE_METERS } from '../utils/constants.js';
+import { escapeRegex } from '../utils/regex.utils.js';
 
 class ShopRepository {
     async create(data) {
@@ -41,6 +42,12 @@ class ShopRepository {
 
     async findByCategory(category, selectFields) {
         const query = Shop.find({ category });
+        if (selectFields) query.select(selectFields);
+        return query;
+    }
+
+    async searchByName(nameQuery, selectFields) {
+        const query = Shop.find({ shopName: { $regex: new RegExp(escapeRegex(nameQuery), 'i') } });
         if (selectFields) query.select(selectFields);
         return query;
     }

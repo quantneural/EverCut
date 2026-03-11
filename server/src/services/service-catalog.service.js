@@ -82,13 +82,9 @@ export const searchServices = async (query, gender) => {
 };
 
 export const searchShops = async (query) => {
-    const Shop = (await import('../models/shop.model.js')).default;
-    return Shop.find({ shopName: { $regex: new RegExp(escapeRegex(query), 'i') } })
-        .select('shopName address location phoneNumber category coverUrl');
+    return shopRepository.searchByName(query, 'shopName address location phoneNumber category coverUrl');
 };
 
 export const getServicesByGender = async (gender) => {
-    const Service = (await import('../models/service.model.js')).default;
-    return Service.find({ serviceFor: gender, isActive: true })
-        .select('serviceName shopId serviceFor serviceType');
+    return serviceRepository.findByGender(gender, 'serviceName shopId serviceFor serviceType');
 };
