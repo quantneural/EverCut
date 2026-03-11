@@ -329,7 +329,11 @@ Similarly, `getServicesByGender` at line 89–93 bypasses the `ServiceRepository
 
 ---
 
-### 5.2 🟡 MEDIUM — Earnings Aggregation Uses `createdAt` Instead of Booking `date`
+### 5.2 ✅ ~~MEDIUM — Earnings Aggregation Uses `createdAt` Instead of Booking `date`~~ **[FIXED]**
+
+> **Status:** ✅ Resolved  
+> **Fixed on:** March 11, 2026  
+> **Fix:** Modified the `$cond` pipelines in `getEarningsAggregation` within `booking.repository.js` to use the `$date` field instead of `$createdAt` for both `lastMonthEarning` and `todayEarning` calculations, ensuring earnings align with actual booking dates.
 
 **File:** `src/repositories/booking.repository.js` — Lines 124–153
 

@@ -135,7 +135,7 @@ class BookingRepository {
                     lastMonthEarning: {
                         $sum: {
                             $cond: [
-                                { $and: [{ $gte: ['$createdAt', startOfLastMonth] }, { $lte: ['$createdAt', endOfLastMonth] }] },
+                                { $and: [{ $gte: ['$date', startOfLastMonth] }, { $lte: ['$date', endOfLastMonth] }] },
                                 '$totalAmount',
                                 0,
                             ],
@@ -144,7 +144,7 @@ class BookingRepository {
                     todayEarning: {
                         $sum: {
                             $cond: [
-                                { $and: [{ $gte: ['$createdAt', startOfToday] }, { $lt: ['$createdAt', endOfToday] }] },
+                                { $and: [{ $gte: ['$date', startOfToday] }, { $lt: ['$date', endOfToday] }] },
                                 '$totalAmount',
                                 0,
                             ],
