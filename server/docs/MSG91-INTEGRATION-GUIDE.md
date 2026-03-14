@@ -16,7 +16,7 @@
 5. [New Dependencies](#5-new-dependencies)
 6. [Implementation — Layer by Layer](#6-implementation--layer-by-layer)
    - [6.1 Constants](#61-constants)
-   - [6.2 MSG91 Provider Service](#62-msg91-provider-service-sms-providerservicej)
+   - [6.2 MSG91 Provider Service](#62-msg91-provider-service-sms-providerservicejs)
    - [6.3 OTP Service](#63-otp-service)
    - [6.4 Auth Service Refactor](#64-auth-service-refactor)
    - [6.5 Validators](#65-validators)
@@ -28,29 +28,53 @@
 7. [JWT Token Strategy](#7-jwt-token-strategy)
 8. [User Model Changes](#8-user-model-changes)
 9. [Migration Strategy — Firebase → MSG91](#9-migration-strategy--firebase--msg91)
-10. [Security Best Practices](#10-security-best-practices)
-11. [Error Handling](#11-error-handling)
-12. [Future SMS Use Cases](#12-future-sms-use-cases)
-13. [Pre-Launch Checklist](#13-pre-launch-checklist)
-14. [File Map — All Changes at a Glance](#14-file-map--all-changes-at-a-glance)
-15. [Legacy Firebase Cleanup — Post-Migration Removal](#15-legacy-firebase-cleanup--post-migration-removal)
+10. [Postman Collection Updates](#10-postman-collection-updates)
+   - [10.1 Current Collection Architecture](#101-current-collection-architecture)
+   - [10.2 Updated Environment File](#102-updated-environment-file)
+   - [10.3 Rewrite `01-authentication.json`](#103-rewrite-01-authenticationjson)
+   - [10.4 Update All Downstream Collections](#104-update-all-downstream-collections-0213)
+   - [10.5 Update Collection Descriptions](#105-update-collection-descriptions)
+   - [10.6 Update `README.md`](#106-update-readmemd)
+   - [10.7 Key Improvements Over the Firebase Workflow](#107-key-improvements-over-the-firebase-workflow)
+   - [10.8 Post-Migration Postman and Tooling Cleanup](#108-post-migration-postman-and-tooling-cleanup)
+   - [10.9 Postman and Tooling File Matrix](#109-postman-and-tooling-file-matrix)
+11. [Security Best Practices](#11-security-best-practices)
+12. [Error Handling](#12-error-handling)
+13. [Future SMS Use Cases](#13-future-sms-use-cases)
+14. [Pre-Launch Checklist](#14-pre-launch-checklist)
+15. [File Map — All Changes at a Glance](#15-file-map--all-changes-at-a-glance)
+16. [Legacy Firebase Cleanup — Post-Migration Removal](#16-legacy-firebase-cleanup--post-migration-removal)
+   - [16.1 Pre-Cleanup Verification Checklist](#161-pre-cleanup-verification-checklist)
+   - [16.2 Step 1 — Remove Firebase Config](#162-step-1--remove-firebase-config)
+   - [16.3 Step 2 — Remove Firebase from Authenticate Middleware](#163-step-2--remove-firebase-from-authenticate-middleware)
+   - [16.4 Step 3 — Remove Legacy Auth Route & Controller Logic](#164-step-3--remove-legacy-auth-route--controller-logic)
+   - [16.5 Step 4 — Refactor Account Service](#165-step-4--refactor-account-service-remove-firebase-admin-sdk-calls)
+   - [16.6 Step 5 — Refactor Onboarding to Use Phone Number Identity](#166-step-5--refactor-onboarding-to-use-phone-number-identity)
+   - [16.7 Step 6 — Update User Model](#167-step-6--update-user-model)
+   - [16.8 Step 7 — Update User Repository](#168-step-7--update-user-repository)
+   - [16.9 Step 8 — Update Upload Middleware](#169-step-8--update-upload-middleware)
+   - [16.10 Step 9 — Remove Firebase Admin SDK Dependency](#1610-step-9--remove-firebase-admin-sdk-dependency)
+   - [16.11 Step 10 — Clean Up Miscellaneous References](#1611-step-10--clean-up-miscellaneous-references)
+   - [16.12 Post-Cleanup Verification](#1612-post-cleanup-verification)
+   - [16.13 Cleanup File Matrix](#1613-cleanup-file-matrix)
+17. [Final Implementation Snapshot](#17-final-implementation-snapshot)
 
 ---
 
 ## 1. Architecture Overview
 
-### Current Flow (Firebase Phone Auth)
+### 1.1 Current Flow (Firebase Phone Auth)
 
-```
+```text
 App → Firebase SDK (sends OTP) → User enters code → Firebase verifies
 → App gets Firebase ID Token → App sends token to Backend
 → authenticate.middleware.js verifies Firebase token via Admin SDK
 → req.user populated → session/onboarding proceeds
 ```
 
-### Target Flow (MSG91 OTP + Custom JWT)
+### 1.2 Target Flow (MSG91 OTP + Custom JWT)
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        MSG91 OTP AUTH FLOW                          │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -78,7 +102,7 @@ App → Firebase SDK (sends OTP) → User enters code → Firebase verifies
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Layer Mapping (follows existing project structure)
+### 1.3 Layer Mapping (Follows Existing Project Structure)
 
 | Layer | Existing Pattern | New File(s) |
 |---|---|---|
@@ -1250,20 +1274,20 @@ Update `authService.refreshAccessToken()` to use this method instead of `findByI
 
 ## 9. Migration Strategy — Firebase → MSG91
 
-### Phase 1: Parallel Support (Weeks 1–2)
+### 9.1 Phase 1: Parallel Support
 
 - Deploy MSG91 OTP endpoints alongside existing Firebase auth
 - `authenticate.middleware.js` accepts **both** JWT and Firebase tokens
 - New app versions use MSG91 flow; old versions continue using Firebase
 - Both `firebaseUid` and `phoneNumber` lookups coexist
 
-### Phase 2: Client Migration (Weeks 3–4)
+### 9.2 Phase 2: Client Migration
 
 - Update mobile app to use MSG91 OTP flow exclusively
 - Force-update old app versions (or show upgrade prompt)
 - Monitor Firebase Auth usage — should drop to zero
 
-### Phase 3: Firebase Cleanup (Week 5+)
+### 9.3 Phase 3: Firebase Cleanup
 
 - Remove Firebase token verification from `authenticate.middleware.js`
 - Remove `firebase-admin` dependency from `package.json`
@@ -1275,7 +1299,693 @@ Update `authService.refreshAccessToken()` to use this method instead of `findByI
 
 ---
 
-## 10. Security Best Practices
+## 10. Postman Collection Updates
+
+> The existing Postman collections in `server/postman-collections/` are tightly coupled to Firebase Phone Auth — every collection stores a `*_firebase_token` variable and uses it as the `Bearer` token for authenticated requests. This section describes exactly how to update them to work with the new MSG91 OTP + JWT authentication flow.
+
+### 10.1 Current Collection Architecture
+
+Before making changes, understand the current structure:
+
+| Component | Current Behavior |
+|---|---|
+| **Environment file** (`EverCut.postman_environment.json`) | Stores `base_url`, `api_prefix`, `customer_firebase_token`, `barber_firebase_token` |
+| **`01-authentication.json`** | Two requests that call `POST /auth/session` with Firebase Bearer tokens; no request body |
+| **Collections 02–13** | All use `{{customer_firebase_token}}` or `{{barber_firebase_token}}` as the Bearer token at collection level |
+| **Pre-request scripts** | Every collection has a `readScopedValue` helper that syncs token values from environment → collection variables |
+| **Token generation** | Running `scripts/firebase-token-gen.js` creates test users + generates 1-hour Firebase ID tokens saved to `scripts/test-tokens.txt` |
+| **Shared globals** | `shared_shop_id`, `shared_employee_id`, `shared_service_id`, etc. — captured by test scripts and shared across collections |
+
+---
+
+### 10.2 Updated Environment File
+
+**File:** `postman-collections/EverCut.postman_environment.json`
+
+Add the new JWT-related variables. During migration, keep the Firebase variables so both flows can be tested.
+
+```json
+{
+  "id": "evercut-local-environment",
+  "name": "EverCut Local",
+  "values": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "enabled": true
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "enabled": true
+    },
+    {
+      "key": "test_customer_mobile",
+      "value": "9876543210",
+      "enabled": true
+    },
+    {
+      "key": "test_barber_mobile",
+      "value": "9876543211",
+      "enabled": true
+    },
+    {
+      "key": "test_otp",
+      "value": "123456",
+      "enabled": true
+    },
+    {
+      "key": "customer_access_token",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "customer_refresh_token",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "barber_access_token",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "barber_refresh_token",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "customer_firebase_token",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "barber_firebase_token",
+      "value": "",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2026-03-14T15:00:00.000Z",
+  "_postman_exported_using": "Manual"
+}
+```
+
+**New variables explained:**
+
+| Variable | Purpose | Value during development |
+|---|---|---|
+| `test_customer_mobile` | Test customer phone number (10-digit) | `9876543210` |
+| `test_barber_mobile` | Test barber phone number (10-digit) | `9876543211` |
+| `test_otp` | Hardcoded test OTP (only works when `MSG91_TEST_MODE=true`) | `123456` |
+| `customer_access_token` | Auto-populated by the authentication collection | *(set by test script)* |
+| `customer_refresh_token` | Auto-populated by the authentication collection | *(set by test script)* |
+| `barber_access_token` | Auto-populated by the authentication collection | *(set by test script)* |
+| `barber_refresh_token` | Auto-populated by the authentication collection | *(set by test script)* |
+
+---
+
+### 10.3 Rewrite `01-authentication.json`
+
+The authentication collection completely changes from 2 Firebase session requests to a full OTP flow with 9 requests.
+
+**New collection structure:**
+
+| # | Method | Endpoint | Description | Auth |
+|---|---|---|---|---|
+| 1 | POST | `/api/v1/auth/otp/send` | Send OTP to customer test number | None |
+| 2 | POST | `/api/v1/auth/otp/verify` | Verify customer OTP → captures `accessToken` + `refreshToken` | None |
+| 3 | POST | `/api/v1/auth/otp/send` | Send OTP to barber test number | None |
+| 4 | POST | `/api/v1/auth/otp/verify` | Verify barber OTP → captures `accessToken` + `refreshToken` | None |
+| 5 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token | None |
+| 6 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token | None |
+| 7 | POST | `/api/v1/auth/logout` | Logout customer | Bearer `{{customer_access_token}}` |
+| 8 | POST | `/api/v1/auth/otp/resend` | Resend OTP (text channel) | None |
+| 9 | GET | `/api/v1/health` | Health check | None |
+
+**Key changes to the collection JSON:**
+
+#### 10.3.1 Collection Variables — Replace Firebase Tokens with OTP Variables
+
+```json
+"variable": [
+  {
+    "key": "base_url",
+    "value": "http://localhost:5000",
+    "type": "string"
+  },
+  {
+    "key": "api_prefix",
+    "value": "api/v1",
+    "type": "string"
+  },
+  {
+    "key": "test_customer_mobile",
+    "value": "9876543210",
+    "type": "string"
+  },
+  {
+    "key": "test_barber_mobile",
+    "value": "9876543211",
+    "type": "string"
+  },
+  {
+    "key": "test_otp",
+    "value": "123456",
+    "type": "string"
+  },
+  {
+    "key": "customer_access_token",
+    "value": "",
+    "type": "string"
+  },
+  {
+    "key": "customer_refresh_token",
+    "value": "",
+    "type": "string"
+  },
+  {
+    "key": "barber_access_token",
+    "value": "",
+    "type": "string"
+  },
+  {
+    "key": "barber_refresh_token",
+    "value": "",
+    "type": "string"
+  }
+]
+```
+
+#### 10.3.2 Pre-Request Script — Sync OTP Variables from Environment
+
+```javascript
+const readScopedValue = (...keys) => {
+  for (const key of keys) {
+    const environmentValue = pm.environment.get(key);
+    if (environmentValue) return environmentValue;
+    const globalValue = pm.globals.get(key);
+    if (globalValue) return globalValue;
+  }
+  return '';
+};
+const baseUrl = readScopedValue('base_url');
+if (baseUrl) { pm.collectionVariables.set('base_url', baseUrl); }
+const apiPrefix = readScopedValue('api_prefix');
+if (apiPrefix) { pm.collectionVariables.set('api_prefix', apiPrefix); }
+
+// Sync OTP test variables
+const customerMobile = readScopedValue('test_customer_mobile');
+if (customerMobile) { pm.collectionVariables.set('test_customer_mobile', customerMobile); }
+const barberMobile = readScopedValue('test_barber_mobile');
+if (barberMobile) { pm.collectionVariables.set('test_barber_mobile', barberMobile); }
+const testOtp = readScopedValue('test_otp');
+if (testOtp) { pm.collectionVariables.set('test_otp', testOtp); }
+```
+
+#### 10.3.3 Request 1 — Send Customer OTP
+
+```json
+{
+  "name": "1. Send Customer OTP",
+  "request": {
+    "method": "POST",
+    "header": [
+      { "key": "Content-Type", "value": "application/json" }
+    ],
+    "url": "{{base_url}}/{{api_prefix}}/auth/otp/send",
+    "body": {
+      "mode": "raw",
+      "raw": "{\n  \"mobile\": \"{{test_customer_mobile}}\"\n}",
+      "options": { "raw": { "language": "json" } }
+    },
+    "auth": { "type": "noauth" }
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+        ]
+      }
+    }
+  ]
+}
+```
+
+#### 10.3.4 Request 2 — Verify Customer OTP (with Auto-Capture)
+
+```json
+{
+  "name": "2. Verify Customer OTP",
+  "request": {
+    "method": "POST",
+    "header": [
+      { "key": "Content-Type", "value": "application/json" }
+    ],
+    "url": "{{base_url}}/{{api_prefix}}/auth/otp/verify",
+    "body": {
+      "mode": "raw",
+      "raw": "{\n  \"mobile\": \"{{test_customer_mobile}}\",\n  \"otp\": \"{{test_otp}}\"\n}",
+      "options": { "raw": { "language": "json" } }
+    },
+    "auth": { "type": "noauth" }
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "",
+          "// Capture tokens for use by all other collections",
+          "if (data.accessToken) {",
+          "  pm.collectionVariables.set('customer_access_token', data.accessToken);",
+          "  pm.environment.set('customer_access_token', data.accessToken);",
+          "}",
+          "if (data.refreshToken) {",
+          "  pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
+          "  pm.environment.set('customer_refresh_token', data.refreshToken);",
+          "}",
+          "",
+          "// Track user state",
+          "pm.collectionVariables.set('last_session_role', 'CUSTOMER');",
+          "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));"
+        ]
+      }
+    }
+  ]
+}
+```
+
+> **Critical automation:** The test script calls `pm.environment.set()` (not just `pm.collectionVariables.set()`) so that the tokens are immediately available to **all other collections** that read from the environment. This replaces the old manual copy-paste workflow for Firebase tokens.
+
+Requests 3 and 4 follow the same pattern for the barber test user, using `{{test_barber_mobile}}` and writing to `barber_access_token` / `barber_refresh_token`.
+
+#### 10.3.5 Request 5 — Refresh Customer Token
+
+```json
+{
+  "name": "5. Refresh Customer Token",
+  "request": {
+    "method": "POST",
+    "header": [
+      { "key": "Content-Type", "value": "application/json" }
+    ],
+    "url": "{{base_url}}/{{api_prefix}}/auth/token/refresh",
+    "body": {
+      "mode": "raw",
+      "raw": "{\n  \"refreshToken\": \"{{customer_refresh_token}}\"\n}",
+      "options": { "raw": { "language": "json" } }
+    },
+    "auth": { "type": "noauth" }
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "if (data.accessToken) {",
+          "  pm.collectionVariables.set('customer_access_token', data.accessToken);",
+          "  pm.environment.set('customer_access_token', data.accessToken);",
+          "}",
+          "if (data.refreshToken) {",
+          "  pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
+          "  pm.environment.set('customer_refresh_token', data.refreshToken);",
+          "}"
+        ]
+      }
+    }
+  ]
+}
+```
+
+#### 10.3.6 Request 7 — Logout (Authenticated)
+
+```json
+{
+  "name": "7. Logout Customer (Terminal)",
+  "request": {
+    "method": "POST",
+    "header": [],
+    "url": "{{base_url}}/{{api_prefix}}/auth/logout",
+    "auth": {
+      "type": "bearer",
+      "bearer": [
+        { "key": "token", "value": "{{customer_access_token}}", "type": "string" }
+      ]
+    }
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "// Clear tokens after logout",
+          "pm.environment.set('customer_access_token', '');",
+          "pm.environment.set('customer_refresh_token', '');"
+        ]
+      }
+    }
+  ]
+}
+```
+
+---
+
+### 10.4 Update All Downstream Collections (02–13)
+
+Every collection from `02-onboarding.json` through `13-barber-ratings.json` needs **three changes**:
+
+#### 10.4.1 Change 1: Collection-Level `auth` — Replace Firebase Token with JWT
+
+**Customer collections** (02-onboarding customer request, 03, 04, 05, 06):
+
+```diff
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+-       "value": "{{customer_firebase_token}}",
++       "value": "{{customer_access_token}}",
+        "type": "string"
+      }
+    ]
+  }
+```
+
+**Barber collections** (02-onboarding barber request, 07, 08, 09, 10, 11, 12, 13):
+
+```diff
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+-       "value": "{{barber_firebase_token}}",
++       "value": "{{barber_access_token}}",
+        "type": "string"
+      }
+    ]
+  }
+```
+
+#### 10.4.2 Change 2: Collection Variables — Rename Token Variables
+
+In each collection's `variable` array:
+
+```diff
+- {
+-   "key": "customer_firebase_token",
+-   "value": "",
+-   "type": "string",
+-   "description": "Paste the ID token for test-customer-001 here"
+- }
++ {
++   "key": "customer_access_token",
++   "value": "",
++   "type": "string",
++   "description": "JWT access token — auto-set by 01-authentication.json"
++ }
+```
+
+Same pattern: `barber_firebase_token` → `barber_access_token`.
+
+#### 10.4.3 Change 3: Pre-Request Script — Sync JWT Tokens Instead of Firebase Tokens
+
+In every collection's pre-request script, replace the token sync logic:
+
+```diff
+- const customerToken = readScopedValue('customer_firebase_token');
+- if (customerToken) { pm.collectionVariables.set('customer_firebase_token', customerToken); }
++ const customerToken = readScopedValue('customer_access_token');
++ if (customerToken) { pm.collectionVariables.set('customer_access_token', customerToken); }
+```
+
+```diff
+- const barberToken = readScopedValue('barber_firebase_token');
+- if (barberToken) { pm.collectionVariables.set('barber_firebase_token', barberToken); }
++ const barberToken = readScopedValue('barber_access_token');
++ if (barberToken) { pm.collectionVariables.set('barber_access_token', barberToken); }
+```
+
+#### 10.4.4 Files Requiring These Changes
+
+| File | Token Variable | Changes needed |
+|---|---|---|
+| `02-onboarding.json` | Both (has 2 requests, one per role) | Update both `customer_firebase_token` → `customer_access_token` and `barber_firebase_token` → `barber_access_token` in variables, auth, and pre-request |
+| `03-customer-profile.json` | Customer | `customer_firebase_token` → `customer_access_token` |
+| `04-customer-bookings.json` | Customer | `customer_firebase_token` → `customer_access_token` |
+| `05-customer-shop-discovery.json` | Customer | `customer_firebase_token` → `customer_access_token` |
+| `06-customer-ratings.json` | Customer | `customer_firebase_token` → `customer_access_token` |
+| `07-barber-profile-shop.json` | Barber | `barber_firebase_token` → `barber_access_token` |
+| `08-barber-employees.json` | Barber | `barber_firebase_token` → `barber_access_token` |
+| `09-barber-services.json` | Barber | `barber_firebase_token` → `barber_access_token` |
+| `10-barber-bookings.json` | Barber | `barber_firebase_token` → `barber_access_token` |
+| `11-barber-photos.json` | Barber | `barber_firebase_token` → `barber_access_token` |
+| `12-barber-earnings.json` | Barber | `barber_firebase_token` → `barber_access_token` |
+| `13-barber-ratings.json` | Barber | `barber_firebase_token` → `barber_access_token` |
+
+---
+
+### 10.5 Update Collection Descriptions
+
+Update the `description` field in the `info` section of each affected collection:
+
+**`01-authentication.json`:**
+
+```diff
+- "description": "Session bootstrap endpoints for the Firebase customer and barber test users created by server/scripts/firebase-token-gen.js."
++ "description": "OTP authentication endpoints for customer and barber test users. Sends OTP, verifies it, and captures JWT access/refresh tokens for use by all other collections. Requires MSG91_TEST_MODE=true for local development."
+```
+
+**`02-onboarding.json`:**
+
+```diff
+- "description": "Customer and barber onboarding requests wired for the Firebase test users and the local sample upload asset."
++ "description": "Customer and barber onboarding requests wired for the OTP test users and the local sample upload asset. Run 01-authentication.json first to populate access tokens."
+```
+
+**`07-barber-profile-shop.json`:**
+
+```diff
+- "description": "Barber profile and shop management collection aligned with the onboarding payloads, shared IDs, and the local sample upload asset."
++ "description": "Barber profile and shop management collection. Uses JWT access token auto-populated by 01-authentication.json."
+```
+
+Update the `description` field of request **9A** in `07-barber-profile-shop.json`:
+
+```diff
+- "description": "Revokes the current Firebase session. Run this only when you are finished with the current barber token."
++ "description": "Revokes the JWT refresh token, invalidating all sessions. Run this only when you are finished testing."
+```
+
+And request **9B**:
+
+```diff
+- "description": "Soft-deletes the barber account and disables the Firebase user. Run this instead of the sign-out request when you want the account deleted."
++ "description": "Soft-deletes the barber account and revokes the JWT refresh token. Run this instead of the sign-out request when you want the account deleted."
+```
+
+---
+
+### 10.6 Update `README.md`
+
+**File:** `postman-collections/README.md`
+
+#### 10.6.1 Update the Setup Section
+
+```diff
+  ### 1. Generate tokens
+
+- ```bash
+- cd server
+- node scripts/firebase-token-gen.js
+- ```
+-
+- This creates two Firebase test users (idempotent) and saves fresh ID tokens to `scripts/test-tokens.txt`.
++ No manual token generation needed. The authentication collection handles everything automatically.
++
++ **Prerequisites:**
++ 1. Ensure `MSG91_TEST_MODE=true` in your `.env` file
++ 2. Ensure `MSG91_TEST_OTP=123456` in your `.env` file
++ 3. Start the server: `npm run dev`
+```
+
+#### 10.6.2 Update the Import Steps
+
+```diff
+  ### 2. Import into Postman
+
+  1. Import every `.json` collection from this folder.
+  2. Import `EverCut.postman_environment.json` as the active environment.
+- 3. Copy the customer ID token from `scripts/test-tokens.txt` into the `customer_firebase_token` environment variable.
+- 4. Copy the barber ID token into the `barber_firebase_token` environment variable.
+- 5. Run requests.
+-
+- > Re-run `node scripts/firebase-token-gen.js` and update the environment variables when tokens expire (after 1 hour).
++ 3. Verify `test_customer_mobile`, `test_barber_mobile`, and `test_otp` are set in the environment.
++ 4. Run `01-authentication.json` requests 1–4 to send+verify OTP for both test users.
++ 5. Access tokens are automatically captured and shared with all other collections.
++ 6. Run other collections in order.
++
++ > Access tokens expire after 15 minutes. Run the **Refresh Token** requests (5–6) in the auth collection,
++ > or re-run requests 1–4 to get new tokens. Unlike Firebase tokens (1-hour expiry, manual copy-paste),
++ > JWT tokens are auto-captured — no manual copy-paste needed.
+```
+
+#### 10.6.3 Update the Test Users Table
+
+```diff
+  ### Test users
+
+  | Role | UID | Email | Phone |
+  |---|---|---|---|
+- | Customer | `test-customer-001` | `test.customer@example.com` | `+15550000001` |
+- | Barber | `test-barber-001` | `test.barber@example.com` | `+15550000002` |
++ | Customer | *(auto-created on first OTP verify)* | `test.customer@example.com` | `9876543210` |
++ | Barber | *(auto-created on first OTP verify)* | `test.barber@example.com` | `9876543211` |
+```
+
+#### 10.6.4 Update the Environment Variables Table
+
+```diff
+  ### Environment variables
+
+  | Variable | Value |
+  |---|---|
+  | `base_url` | `http://localhost:5000` |
+  | `api_prefix` | `api/v1` |
+- | `customer_firebase_token` | Customer ID token (set by token generator) |
+- | `barber_firebase_token` | Barber ID token (set by token generator) |
++ | `test_customer_mobile` | `9876543210` (test customer phone number) |
++ | `test_barber_mobile` | `9876543211` (test barber phone number) |
++ | `test_otp` | `123456` (accepted when `MSG91_TEST_MODE=true`) |
++ | `customer_access_token` | *(auto-set by 01-authentication.json)* |
++ | `customer_refresh_token` | *(auto-set by 01-authentication.json)* |
++ | `barber_access_token` | *(auto-set by 01-authentication.json)* |
++ | `barber_refresh_token` | *(auto-set by 01-authentication.json)* |
+```
+
+#### 10.6.5 Update the Authentication Collection Request Reference
+
+```diff
+  ### `01-authentication.json`
+
+  | # | Method | Endpoint | Description |
+  |---|---|---|---|
+- | 1 | POST | `/api/v1/auth/session` | Create customer session |
+- | 2 | POST | `/api/v1/auth/session` | Create barber session |
+- | 3 | GET | `/api/v1/health` | Health check |
++ | 1 | POST | `/api/v1/auth/otp/send` | Send OTP to customer |
++ | 2 | POST | `/api/v1/auth/otp/verify` | Verify customer OTP — captures tokens |
++ | 3 | POST | `/api/v1/auth/otp/send` | Send OTP to barber |
++ | 4 | POST | `/api/v1/auth/otp/verify` | Verify barber OTP — captures tokens |
++ | 5 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token |
++ | 6 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token |
++ | 7 | POST | `/api/v1/auth/logout` | Logout customer *(Terminal)* |
++ | 8 | POST | `/api/v1/auth/otp/resend` | Resend OTP (text channel) |
++ | 9 | GET | `/api/v1/health` | Health check |
+```
+
+#### 10.6.6 Update the Recommended Run Order
+
+```diff
+  ### Barber side (must run first to create bookable data)
+
+- 1. `01-authentication.json` → **2. Create Barber Session**
++ 1. `01-authentication.json` → **3. Send Barber OTP** → **4. Verify Barber OTP**
+  2. `02-onboarding.json` → **2. Complete Barber Profile** *(first run only)*
+  ...
+
+  ### Customer side
+
+- 1. `01-authentication.json` → **1. Create Customer Session**
++ 1. `01-authentication.json` → **1. Send Customer OTP** → **2. Verify Customer OTP**
+  2. `02-onboarding.json` → **1. Complete Customer Profile** *(first run only)*
+  ...
+```
+
+---
+
+### 10.7 Key Improvements Over the Firebase Workflow
+
+| Aspect | Before (Firebase) | After (MSG91 + JWT) |
+|---|---|---|
+| **Token generation** | Run `firebase-token-gen.js`, manually copy tokens | Run auth requests 1–4, tokens auto-captured |
+| **Token expiry** | 1 hour, then re-run script + re-paste | 15 min access / 30 day refresh; use refresh request to renew |
+| **Manual steps** | 3 (run script, copy customer token, copy barber token) | 0 (fully automated) |
+| **External dependency** | Requires Firebase project + service account | Requires `MSG91_TEST_MODE=true` in `.env` only |
+| **Token persistence** | Lost when environment reloads | Saved in environment file via `pm.environment.set()` |
+
+---
+
+### 10.8 Post-Migration Postman and Tooling Cleanup
+
+After completing [Section 16](#16-legacy-firebase-cleanup--post-migration-removal), clean up the Postman assets and Firebase-era helper scripts:
+
+1. **Remove Firebase variables** from `EverCut.postman_environment.json`:
+   - Delete `customer_firebase_token`
+   - Delete `barber_firebase_token`
+
+2. **Remove legacy requests** from `01-authentication.json`:
+   - Delete any remaining `POST /auth/session` requests (if kept for migration testing)
+
+3. **Remove Firebase references** from all collection descriptions, variable descriptions, and pre-request scripts.
+
+4. **Delete `scripts/firebase-token-gen.js`** — no longer needed.
+
+5. **Delete `scripts/verify-token.js`** or replace it with a JWT inspection helper if the team still wants a local auth debugging script.
+
+6. **Delete generated Firebase token artifacts** such as `scripts/test-tokens.txt` and `scripts/test-tokens.json` if they exist locally.
+
+7. **Update `postman-collections/README.md` and `scripts/README.md`** — remove all mentions of `firebase-token-gen.js`, Firebase test users, and `test-tokens.txt`.
+
+8. **Verify all collections** — run the full recommended order from auth through barber ratings, confirming every request passes with JWT tokens.
+
+---
+
+### 10.9 Postman and Tooling File Matrix
+
+```text
+postman-collections/
+├── 01-authentication.json          ← REWRITE: Firebase sessions → OTP flow (9 requests)
+├── 02-onboarding.json              ← UPDATE: auth vars + descriptions
+├── 03-customer-profile.json        ← UPDATE: customer_firebase_token → customer_access_token
+├── 04-customer-bookings.json       ← UPDATE: customer_firebase_token → customer_access_token
+├── 05-customer-shop-discovery.json  ← UPDATE: customer_firebase_token → customer_access_token
+├── 06-customer-ratings.json        ← UPDATE: customer_firebase_token → customer_access_token
+├── 07-barber-profile-shop.json     ← UPDATE: barber_firebase_token → barber_access_token + descriptions
+├── 08-barber-employees.json        ← UPDATE: barber_firebase_token → barber_access_token
+├── 09-barber-services.json         ← UPDATE: barber_firebase_token → barber_access_token
+├── 10-barber-bookings.json         ← UPDATE: barber_firebase_token → barber_access_token
+├── 11-barber-photos.json           ← UPDATE: barber_firebase_token → barber_access_token
+├── 12-barber-earnings.json         ← UPDATE: barber_firebase_token → barber_access_token
+├── 13-barber-ratings.json          ← UPDATE: barber_firebase_token → barber_access_token
+├── EverCut.postman_environment.json ← ADD: OTP + JWT vars; KEEP Firebase vars during migration
+└── README.md                       ← REWRITE: setup, run order, variables, request reference
+
+scripts/
+├── firebase-token-gen.js           ← DELETE
+├── verify-token.js                 ← DELETE or REPLACE with JWT helper
+└── README.md                       ← UPDATE: remove Firebase token workflow
+```
+
+---
+
+## 11. Security Best Practices
 
 | Practice | Implementation |
 |---|---|
@@ -1293,7 +2003,7 @@ Update `authService.refreshAccessToken()` to use this method instead of `findByI
 | **DLT template lock** | OTP message text is fixed at the DLT level — cannot be injected |
 | **Test mode isolation** | `MSG91_TEST_MODE=true` only works when `NODE_ENV=development` (add guard) |
 
-### Production Test Mode Guard
+### 11.1 Production Test Mode Guard
 
 Add this safety check in `sms-provider.service.js`:
 
@@ -1306,7 +2016,7 @@ if (config.msg91.testMode && config.env === 'production') {
 
 ---
 
-## 11. Error Handling
+## 12. Error Handling
 
 All errors follow the existing `AppError` hierarchy and are caught by `error-handler.middleware.js`:
 
@@ -1325,7 +2035,7 @@ All errors follow the existing `AppError` hierarchy and are caught by `error-han
 
 ---
 
-## 12. Future SMS Use Cases
+## 13. Future SMS Use Cases
 
 The `sms-provider.service.js` abstraction layer is designed to support future SMS needs beyond OTP:
 
@@ -1338,7 +2048,7 @@ The `sms-provider.service.js` abstraction layer is designed to support future SM
 | **Multi-country OTP** | Update `sendOtp()` to accept a country code parameter. Remove the hardcoded `91` prefix. |
 | **Switching providers** | Create a new provider file (e.g., `twilio-provider.service.js`) with the same exported function signatures. Swap the import in `otp.service.js`. |
 
-### Provider Interface Contract
+### 13.1 Provider Interface Contract
 
 Any future SMS provider must export these functions:
 
@@ -1350,9 +2060,9 @@ export const resendOtp = async (mobile, retryType) => { /* returns { success } *
 
 ---
 
-## 13. Pre-Launch Checklist
+## 14. Pre-Launch Checklist
 
-### MSG91 & DLT
+### 14.1 MSG91 & DLT
 
 - [ ] MSG91 account created and Auth Key obtained
 - [ ] OTP template created in MSG91 dashboard (note Template ID)
@@ -1363,7 +2073,7 @@ export const resendOtp = async (mobile, retryType) => { /* returns { success } *
 - [ ] DLT Entity ID + Sender ID + Template ID configured in MSG91 dashboard
 - [ ] Calendar reminder set for annual DLT renewal (~₹5,900/year)
 
-### Backend
+### 14.2 Backend
 
 - [ ] `jsonwebtoken` installed (`npm install jsonwebtoken`)
 - [ ] All env vars added to `.env` and `.env.example`
@@ -1384,7 +2094,7 @@ export const resendOtp = async (mobile, retryType) => { /* returns { success } *
 - [ ] Refresh token rotation tested (happy path + theft detection)
 - [ ] Rate limiting tested (send + verify)
 
-### Security
+### 14.3 Security
 
 - [ ] JWT secrets generated (64+ chars, cryptographically random)
 - [ ] Different secrets for access vs refresh tokens
@@ -1394,7 +2104,7 @@ export const resendOtp = async (mobile, retryType) => { /* returns { success } *
 - [ ] CORS origins restricted in production
 - [ ] HTTPS enforced in production
 
-### Client (Mobile App)
+### 14.4 Client (Mobile App)
 
 - [ ] App updated to use `/auth/otp/send` and `/auth/otp/verify`
 - [ ] Token storage uses device secure storage (Keychain/Keystore)
@@ -1405,9 +2115,9 @@ export const resendOtp = async (mobile, retryType) => { /* returns { success } *
 
 ---
 
-## 14. File Map — All Changes at a Glance
+## 15. File Map — All Changes at a Glance
 
-```
+```text
 server/
 ├── .env.example                          ← ADD: MSG91 + JWT env vars
 ├── package.json                          ← ADD: jsonwebtoken dependency
@@ -1438,7 +2148,7 @@ server/
                                              refreshToken schemas
 ```
 
-### New Files (3)
+### 15.1 New Files (3)
 
 | File | Purpose |
 |---|---|
@@ -1446,13 +2156,14 @@ server/
 | `services/otp.service.js` | OTP orchestration with rate limiting |
 | `middleware/otp-rate-limiter.middleware.js` | Express middleware for OTP endpoint rate limiting |
 
-### Modified Files (8)
+### 15.2 Modified Files (11)
 
 | File | Change |
 |---|---|
 | `.env.example` | Add MSG91 + JWT environment variables |
 | `package.json` | Add `jsonwebtoken` dependency |
 | `config/index.js` | Add `msg91` and `jwt` config sections |
+| `services/auth.service.js` | Add JWT generation, refresh rotation, and OTP session resolution |
 | `models/user.model.js` | Add `refreshTokenHash` field |
 | `repositories/user.repository.js` | Add `findByIdWithRefreshHash()` method |
 | `validators/auth.validator.js` | Replace with comprehensive OTP/token schemas |
@@ -1463,7 +2174,7 @@ server/
 
 ---
 
-## API Endpoint Summary
+### 15.3 API Endpoint Matrix
 
 | Method | Endpoint | Auth | Purpose |
 |---|---|---|---|
@@ -1476,11 +2187,11 @@ server/
 
 ---
 
-## 15. Legacy Firebase Cleanup — Post-Migration Removal
+## 16. Legacy Firebase Cleanup — Post-Migration Removal
 
 > ⚠️ **Do NOT execute this section until ALL of the following conditions are met.** Premature removal will break authentication for users still on older app versions.
 
-### 15.1 Pre-Cleanup Verification Checklist
+### 16.1 Pre-Cleanup Verification Checklist
 
 Before removing any Firebase code, confirm **every** item below:
 
@@ -1490,16 +2201,16 @@ Before removing any Firebase code, confirm **every** item below:
 - [ ] **JWT-based authentication** is fully operational — all protected endpoints work with the new access tokens
 - [ ] **Token refresh** flow is verified — users can refresh access tokens without re-authenticating
 - [ ] **Onboarding flow** works end-to-end using phone number identity (not `firebaseUid`)
-- [ ] **Account deletion** works without Firebase (see Step 15.5 below)
-- [ ] **Sign-out-everywhere** works using JWT revocation (see Step 15.5 below)
+- [ ] **Account deletion** works without Firebase (see [§16.5](#165-step-4--refactor-account-service-remove-firebase-admin-sdk-calls))
+- [ ] **Sign-out-everywhere** works using JWT revocation (see [§16.5](#165-step-4--refactor-account-service-remove-firebase-admin-sdk-calls))
 - [ ] **Old app versions** are either force-updated or have been sunset with an upgrade prompt
 - [ ] **A database backup** has been taken before making any schema changes
 
 ---
 
-### 15.2 Step 1 — Remove Firebase Config
+### 16.2 Step 1 — Remove Firebase Config
 
-#### 15.2.1 Delete `src/config/firebase.config.js`
+#### 16.2.1 Delete `src/config/firebase.config.js`
 
 ```bash
 rm src/config/firebase.config.js
@@ -1507,7 +2218,7 @@ rm src/config/firebase.config.js
 
 This file initializes the Firebase Admin SDK singleton. It is no longer needed.
 
-#### 15.2.2 Delete `firebase-admin-sdk.json`
+#### 16.2.2 Delete `firebase-admin-sdk.json`
 
 ```bash
 rm firebase-admin-sdk.json
@@ -1515,7 +2226,7 @@ rm firebase-admin-sdk.json
 
 This is the Firebase service account credentials file at the project root.
 
-#### 15.2.3 Remove Firebase section from `src/config/index.js`
+#### 16.2.3 Remove Firebase section from `src/config/index.js`
 
 Remove the entire `firebase` block:
 
@@ -1542,7 +2253,7 @@ Remove the entire `firebase` block:
     msg91: Object.freeze({
 ```
 
-#### 15.2.4 Remove Firebase environment variables
+#### 16.2.4 Remove Firebase environment variables
 
 **From `.env`:**
 
@@ -1557,7 +2268,7 @@ Remove the entire `firebase` block:
 
 ---
 
-### 15.3 Step 2 — Remove Firebase from Authenticate Middleware
+### 16.3 Step 2 — Remove Firebase from Authenticate Middleware
 
 **File:** `src/middleware/authenticate.middleware.js`
 
@@ -1621,9 +2332,9 @@ export default authenticate;
 
 ---
 
-### 15.4 Step 3 — Remove Legacy Auth Route & Controller Logic
+### 16.4 Step 3 — Remove Legacy Auth Route & Controller Logic
 
-#### 15.4.1 Remove `POST /auth/session` route
+#### 16.4.1 Remove `POST /auth/session` route
 
 **File:** `src/routes/auth.routes.js`
 
@@ -1641,19 +2352,19 @@ Remove the legacy session route:
 
 Also remove the `sessionSchema` import from the validators import line.
 
-#### 15.4.2 Remove `createSession` from controller
+#### 16.4.2 Remove `createSession` from controller
 
 **File:** `src/controllers/auth.controller.js`
 
 Delete the entire `createSession` export function (the `@deprecated` one).
 
-#### 15.4.3 Remove `createSession` from auth service
+#### 16.4.3 Remove `createSession` from auth service
 
 **File:** `src/services/auth.service.js`
 
 Delete the entire legacy `createSession` function at the bottom of the file (the one marked `@deprecated`).
 
-#### 15.4.4 Remove `sessionSchema` from validators
+#### 16.4.4 Remove `sessionSchema` from validators
 
 **File:** `src/validators/auth.validator.js`
 
@@ -1668,7 +2379,7 @@ Delete:
 
 ---
 
-### 15.5 Step 4 — Refactor Account Service (Remove Firebase Admin SDK Calls)
+### 16.5 Step 4 — Refactor Account Service (Remove Firebase Admin SDK Calls)
 
 **File:** `src/services/account.service.js`
 
@@ -1677,7 +2388,7 @@ This file currently uses `firebase-admin` for three operations:
 2. `signOutEverywhere()` — revokes Firebase refresh tokens
 3. `deleteBarberAccount()` — calls `cleanupFirebaseAccess()`
 
-#### Replace with JWT-based equivalents:
+#### 16.5.1 Replace with JWT-Based Equivalents
 
 ```diff
 - import admin from '../config/firebase.config.js';
@@ -1745,7 +2456,7 @@ This function is no longer needed — JWT revocation is handled by setting `refr
   };
 ```
 
-#### Update the controller caller
+#### 16.5.2 Update the Controller Caller
 
 **File:** `src/controllers/barber/barber-profile.controller.js`
 
@@ -1758,11 +2469,11 @@ Update the `signOutEverywhere` call to pass `userId` instead of `firebaseUid`:
 
 ---
 
-### 15.6 Step 5 — Refactor Onboarding to Use Phone Number Identity
+### 16.6 Step 5 — Refactor Onboarding to Use Phone Number Identity
 
 The onboarding flow currently uses `firebaseUid` as the identity key passed from the controller. After migration, use the verified `phoneNumber` instead.
 
-#### 15.6.1 Update Onboarding Controller
+#### 16.6.1 Update Onboarding Controller
 
 **File:** `src/controllers/onboarding.controller.js`
 
@@ -1790,7 +2501,7 @@ The onboarding flow currently uses `firebaseUid` as the identity key passed from
   };
 ```
 
-#### 15.6.2 Update Onboarding Service
+#### 16.6.2 Update Onboarding Service
 
 **File:** `src/services/onboarding.service.js`
 
@@ -1850,7 +2561,7 @@ Apply the same pattern to `createBarberOnboarding` — replace `firebaseUid` par
 
 ---
 
-### 15.7 Step 6 — Update User Model
+### 16.7 Step 6 — Update User Model
 
 **File:** `src/models/user.model.js`
 
@@ -1886,7 +2597,7 @@ await mongoose.disconnect();
 
 ---
 
-### 15.8 Step 7 — Update User Repository
+### 16.8 Step 7 — Update User Repository
 
 **File:** `src/repositories/user.repository.js`
 
@@ -1902,7 +2613,7 @@ This method is no longer called by any service or middleware after cleanup.
 
 ---
 
-### 15.9 Step 8 — Update Upload Middleware
+### 16.9 Step 8 — Update Upload Middleware
 
 **File:** `src/middleware/upload.middleware.js`
 
@@ -1915,7 +2626,7 @@ Remove the `firebaseUid` fallback in the actor key resolver:
 
 ---
 
-### 15.10 Step 9 — Remove Firebase Admin SDK Dependency
+### 16.10 Step 9 — Remove Firebase Admin SDK Dependency
 
 ```bash
 npm uninstall firebase-admin
@@ -1933,9 +2644,9 @@ Should show `(empty)` — no package found.
 
 ---
 
-### 15.11 Step 10 — Clean Up Miscellaneous References
+### 16.11 Step 10 — Clean Up Miscellaneous References
 
-#### Model comments
+#### 16.11.1 Model Comments
 
 Several model files contain historical comments referencing `firebaseUid`. These are informational — optionally clean them up:
 
@@ -1947,18 +2658,26 @@ Several model files contain historical comments referencing `firebaseUid`. These
 | `models/employee.model.js` | Comment: *"shopId replaces old firebaseUid"* | Update or remove comment |
 | `utils/logger.js` | Comment: *"Firebase private keys"* | Keep — the redaction pattern is still useful for general private key safety |
 
-#### Scripts directory
+#### 16.11.2 Scripts Directory
 
-Check `server/scripts/` for any Firebase-specific scripts (e.g., token generation scripts that use `FIREBASE_API_KEY`). Remove or archive them.
+The current repo also contains Firebase-specific helper scripts and generated artifacts. Keep this step aligned with [§10.8](#108-post-migration-postman-and-tooling-cleanup):
+
+| File | Action |
+|---|---|
+| `scripts/firebase-token-gen.js` | Delete |
+| `scripts/verify-token.js` | Delete or replace with a JWT inspection helper |
+| `scripts/README.md` | Remove Firebase token generation and verification instructions |
+| `scripts/test-tokens.txt` | Delete if present locally (generated artifact) |
+| `scripts/test-tokens.json` | Delete if present locally (generated artifact) |
 
 ---
 
-### 15.12 Post-Cleanup Verification
+### 16.12 Post-Cleanup Verification
 
 After completing all removal steps, run through this final verification:
 
 - [ ] **Server starts cleanly** — `npm run dev` shows no import errors or missing module warnings
-- [ ] **No Firebase references in production code** — run: `grep -ri "firebase" src/` — should return only model comments (if kept) and the logger redaction pattern
+- [ ] **No Firebase references in production code** — run: `rg -n "firebase" src/` — should return only model comments (if kept) and the logger redaction pattern
 - [ ] **OTP send works** — `POST /api/v1/auth/otp/send` returns success
 - [ ] **OTP verify works** — `POST /api/v1/auth/otp/verify` returns tokens for existing users, `isNewUser: true` for new users
 - [ ] **Token refresh works** — `POST /api/v1/auth/token/refresh` issues new token pair
@@ -1975,14 +2694,18 @@ After completing all removal steps, run through this final verification:
 
 ---
 
-### 15.13 Cleanup Summary — Files Removed / Modified
+### 16.13 Cleanup File Matrix
 
-```
+```text
 server/
 ├── firebase-admin-sdk.json                  ← DELETE
 ├── .env                                     ← REMOVE: FIREBASE_* variables
 ├── .env.example                             ← REMOVE: FIREBASE_* variables + section header
 ├── package.json                             ← REMOVE: firebase-admin dependency (npm uninstall)
+├── scripts/
+│   ├── firebase-token-gen.js                ← DELETE
+│   ├── verify-token.js                      ← DELETE or REPLACE with JWT helper
+│   └── README.md                            ← UPDATE: remove Firebase token workflow
 └── src/
     ├── config/
     │   ├── firebase.config.js               ← DELETE (entire file)
@@ -2010,7 +2733,19 @@ server/
         └── auth.validator.js                ← REMOVE: sessionSchema
 ```
 
-> **Total:** 2 files deleted, 13 files modified, 1 dependency removed.
+> Also remove local generated artifacts such as `scripts/test-tokens.txt` and `scripts/test-tokens.json` if they exist.
+
+---
+
+## 17. Final Implementation Snapshot
+
+By the end of this guide, the EverCut backend moves from Firebase phone auth to an MSG91 + JWT flow with three clearly separated phases:
+
+- Implementation adds the OTP provider layer, token lifecycle management, validators, middleware, and controller/route updates.
+- Postman and local tooling updates keep the team’s test workflow aligned during the migration window.
+- Final cleanup removes Firebase runtime dependencies, legacy routes, migration-only code paths, and Firebase-era helper scripts.
+
+Use [Section 10](#10-postman-collection-updates) for the Postman/tooling work, [Section 15](#15-file-map--all-changes-at-a-glance) for the implementation file map, and [Section 16](#16-legacy-firebase-cleanup--post-migration-removal) for the final removal checklist and cleanup matrix.
 
 ---
 
