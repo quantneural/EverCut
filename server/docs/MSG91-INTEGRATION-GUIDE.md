@@ -47,10 +47,10 @@
    - [7.5 Update User Repository](#75-update-user-repository)
    - [7.6 Update Upload Middleware](#76-update-upload-middleware)
    - [7.7 Clean Up Model Comments](#77-clean-up-model-comments)
-   - [7.7a Update Authorize Middleware](#77a-update-authorize-middleware)
-   - [7.8 Clean Up Scripts](#78-clean-up-scripts)
-   - [7.9 Clean Up Environment & Config](#79-clean-up-environment--config)
-   - [7.10 Remove Firebase Dependency](#710-remove-firebase-dependency)
+   - [7.8 Update Authorize Middleware](#78-update-authorize-middleware)
+   - [7.9 Clean Up Scripts](#79-clean-up-scripts)
+   - [7.10 Clean Up Environment & Config](#710-clean-up-environment--config)
+   - [7.11 Remove Firebase Dependency](#711-remove-firebase-dependency)
 8. [Security Best Practices](#8-security-best-practices)
 9. [Error Handling](#9-error-handling)
 10. [Future SMS Use Cases](#10-future-sms-use-cases)
@@ -1361,7 +1361,7 @@ Remove historical `firebaseUid` comments from these files:
 | `models/employee.model.js` | *"shopId replaces old firebaseUid"* |
 | `utils/logger.js` | Rename *"Firebase private keys"* → *"private keys"* |
 
-### 7.7a Update Authorize Middleware
+### 7.8 Update Authorize Middleware
 
 **File:** `src/middleware/authorize.middleware.js`
 
@@ -1394,7 +1394,7 @@ The authorize middleware currently checks `req.user.isNewUser` — a flag that w
 
 > **Onboarding routes** use `authenticateOnboarding`. All other route groups (customer, barber) use standard token authentication + `authorize(ROLES.CUSTOMER)` or `authorize(ROLES.BARBER)`.
 
-### 7.8 Clean Up Scripts
+### 7.9 Clean Up Scripts
 
 **File:** `src/controllers/barber/barber-profile.controller.js`
 
@@ -1431,7 +1431,7 @@ The authorize middleware currently checks `req.user.isNewUser` — a flag that w
 
 **File:** `scripts/README.md` — Remove all Firebase token generation and verification instructions.
 
-### 7.9 Clean Up Environment & Config
+### 7.10 Clean Up Environment & Config
 
 **Remove from `.env` and `.env.example`:**
 - `FIREBASE_PROJECT_ID`
@@ -1450,7 +1450,7 @@ The authorize middleware currently checks `req.user.isNewUser` — a flag that w
 - firebase-tokens.txt
 ```
 
-### 7.10 Remove Firebase Dependency
+### 7.11 Remove Firebase Dependency
 
 ```bash
 npm uninstall firebase-admin
