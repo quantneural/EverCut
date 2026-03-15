@@ -1,4 +1,4 @@
-# Postman Collection Updates — MSG91 OTP + JWT Authentication
+# Postman Collection Updates - MSG91 OTP + JWT Authentication
 
 > **Parent Document:** [`MSG91-INTEGRATION-GUIDE.md`](./MSG91-INTEGRATION-GUIDE.md)  
 > **Scope:** Updating all Postman collections and tooling for MSG91 OTP + JWT authentication  
@@ -10,7 +10,7 @@
 
 1. [Environment File](#1-environment-file)
 2. [Rewrite `01-authentication.json`](#2-rewrite-01-authenticationjson)
-3. [Update All Downstream Collections (02–13)](#3-update-all-downstream-collections-0213)
+3. [Update All Downstream Collections (02-13)](#3-update-all-downstream-collections-02-13)
 4. [Update Collection Descriptions](#4-update-collection-descriptions)
 5. [Update `README.md`](#5-update-readmemd)
 6. [Update Postman Collection Generator](#6-update-postman-collection-generator)
@@ -50,10 +50,10 @@ Replace Firebase token variables with OTP/JWT variables:
 | `test_customer_mobile` | Test customer phone (10-digit) | `9876543210` |
 | `test_barber_mobile` | Test barber phone (10-digit) | `9876543211` |
 | `test_otp` | Hardcoded OTP (only when `MSG91_TEST_MODE=true`) | `123456` |
-| `customer_access_token` | Auto-set by auth collection | *(set by test script)* |
-| `customer_refresh_token` | Auto-set by auth collection | *(set by test script)* |
-| `barber_access_token` | Auto-set by auth collection | *(set by test script)* |
-| `barber_refresh_token` | Auto-set by auth collection | *(set by test script)* |
+| `customer_access_token` | Auto-set by auth or onboarding collections | *(set by test script)* |
+| `customer_refresh_token` | Auto-set by auth or onboarding collections | *(set by test script)* |
+| `barber_access_token` | Auto-set by auth or onboarding collections | *(set by test script)* |
+| `barber_refresh_token` | Auto-set by auth or onboarding collections | *(set by test script)* |
 | `customer_onboarding_token` | Auto-set by auth collection | *(set by test script)* |
 | `barber_onboarding_token` | Auto-set by auth collection | *(set by test script)* |
 
@@ -66,9 +66,9 @@ The authentication collection uses the full OTP flow with 9 requests:
 | # | Method | Endpoint | Description | Auth |
 |---|---|---|---|---|
 | 1 | POST | `/api/v1/auth/otp/send` | Send OTP to customer test number | None |
-| 2 | POST | `/api/v1/auth/otp/verify` | Verify customer OTP → captures tokens | None |
+| 2 | POST | `/api/v1/auth/otp/verify` | Verify customer OTP → captures onboarding or session tokens | None |
 | 3 | POST | `/api/v1/auth/otp/send` | Send OTP to barber test number | None |
-| 4 | POST | `/api/v1/auth/otp/verify` | Verify barber OTP → captures tokens | None |
+| 4 | POST | `/api/v1/auth/otp/verify` | Verify barber OTP → captures onboarding or session tokens | None |
 | 5 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token | None |
 | 6 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token | None |
 | 7 | POST | `/api/v1/auth/logout` | Logout customer | Bearer `{{customer_access_token}}` |
@@ -119,7 +119,7 @@ const testOtp = readScopedValue('test_otp');
 if (testOtp) { pm.collectionVariables.set('test_otp', testOtp); }
 ```
 
-### 2.3 Send OTP Request (Example — Customer)
+### 2.3 Send OTP Request (Example - Customer)
 
 ```json
 {
@@ -145,7 +145,7 @@ if (testOtp) { pm.collectionVariables.set('test_otp', testOtp); }
 }
 ```
 
-### 2.4 Verify OTP Request (Example — Customer, with Auto-Capture)
+### 2.4 Verify OTP Request (Example - Customer, with Auto-Capture)
 
 ```json
 {
@@ -193,9 +193,9 @@ if (testOtp) { pm.collectionVariables.set('test_otp', testOtp); }
 }
 ```
 
-> **Critical:** The test script uses `pm.environment.set()` so tokens are immediately available to **all other collections**. Requests 3–4 follow the same pattern for the barber user.
+> **Critical:** The test script uses `pm.environment.set()` so the returned token is immediately available to the next collection in the flow. Brand-new users receive onboarding tokens first; returning users receive access and refresh tokens directly. Requests 3-4 follow the same pattern for the barber user.
 
-### 2.5 Refresh Token Request (Example — Customer)
+### 2.5 Refresh Token Request (Example - Customer)
 
 ```json
 {
@@ -233,7 +233,7 @@ if (testOtp) { pm.collectionVariables.set('test_otp', testOtp); }
 }
 ```
 
-### 2.6 Logout Request (Example — Customer)
+### 2.6 Logout Request (Example - Customer)
 
 ```json
 {
@@ -263,11 +263,11 @@ if (testOtp) { pm.collectionVariables.set('test_otp', testOtp); }
 
 ---
 
-## 3. Update All Downstream Collections (02–13)
+## 3. Update All Downstream Collections (02-13)
 
 Every collection needs **three changes**:
 
-### 3.1 Collection-Level `auth` — Use JWT Access Tokens
+### 3.1 Collection-Level `auth` - Use JWT Access Tokens
 
 **Customer Onboarding collection** (`02-onboarding.json` Customer request):
 ```json
@@ -306,11 +306,11 @@ Every collection needs **three changes**:
 ### 3.2 Collection Variables
 
 ```json
-{ "key": "customer_access_token", "value": "", "description": "JWT access token — auto-set by 01-authentication.json" }
-{ "key": "barber_access_token", "value": "", "description": "JWT access token — auto-set by 01-authentication.json" }
+{ "key": "customer_access_token", "value": "", "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup" }
+{ "key": "barber_access_token", "value": "", "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup" }
 ```
 
-### 3.3 Pre-Request Script — Sync JWT Tokens
+### 3.3 Pre-Request Script - Sync JWT Tokens
 
 ```javascript
 const customerToken = readScopedValue('customer_access_token');
@@ -343,9 +343,9 @@ if (barberToken) { pm.collectionVariables.set('barber_access_token', barberToken
 
 | Collection | New Description |
 |---|---|
-| `01-authentication.json` | `"OTP authentication endpoints for customer and barber test users. Sends OTP, verifies it, and captures JWT access/refresh tokens for use by all other collections. Requires MSG91_TEST_MODE=true for local development."` |
+| `01-authentication.json` | `"OTP authentication endpoints for customer and barber test users. Sends OTP, verifies it, and captures onboarding tokens for brand-new users or JWT access/refresh tokens for returning users. Requires MSG91_TEST_MODE=true for local development."` |
 | `02-onboarding.json` | `"Customer and barber onboarding requests wired for the OTP test users and the local sample upload asset. Run 01-authentication.json first to populate onboarding tokens. Upon successful onboarding, access and refresh tokens are captured for the other collections."` |
-| `07-barber-profile-shop.json` | `"Barber profile and shop management collection. Uses JWT access token auto-populated by 01-authentication.json."` |
+| `07-barber-profile-shop.json` | `"Barber profile and shop management collection. Uses the barber JWT access token captured by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup."` |
 
 Request **9A** in `07-barber-profile-shop.json`:
 
@@ -374,7 +374,7 @@ Request **9B** in `07-barber-profile-shop.json`:
 2. Ensure `MSG91_TEST_OTP=123456` in your `.env` file
 3. Start the server: `npm run dev`
 
-No manual token generation needed — the authentication collection handles everything automatically.
+No manual token generation needed - the authentication and onboarding collections handle token capture automatically.
 ```
 
 ### 5.2 Import Steps
@@ -385,20 +385,20 @@ No manual token generation needed — the authentication collection handles ever
 1. Import every `.json` collection from this folder.
 2. Import `EverCut.postman_environment.json` as the active environment.
 3. Verify `test_customer_mobile`, `test_barber_mobile`, and `test_otp` are set in the environment.
-4. Run `01-authentication.json` requests 1–4 to send+verify OTP for both test users.
-5. Access tokens are automatically captured and shared with all other collections.
+4. Run `01-authentication.json` requests 1-4 to send+verify OTP for both test users.
+5. Returning users get access tokens immediately; brand-new users get onboarding tokens first and then receive access tokens from `02-onboarding.json`.
 6. Run other collections in order.
 
-> Access tokens expire after 15 minutes. Run the **Refresh Token** requests (5–6)
-> or re-run requests 1–4 to get new tokens. Tokens are auto-captured — no manual copy-paste.
+> Access tokens expire after 15 minutes once onboarding is complete. Run the **Refresh Token** requests (5-6)
+> or re-run requests 1-4 to get fresh tokens. Tokens are auto-captured - no manual copy-paste.
 ```
 
 ### 5.3 Test Users
 
 | Role | UID | Email | Phone |
 |---|---|---|---|
-| Customer | *(auto-created on first OTP verify)* | `test.customer@example.com` | `9876543210` |
-| Barber | *(auto-created on first OTP verify)* | `test.barber@example.com` | `9876543211` |
+| Customer | *(created during first successful onboarding)* | `test.customer@example.com` | `9876543210` |
+| Barber | *(created during first successful onboarding)* | `test.barber@example.com` | `9876543211` |
 
 ### 5.4 Environment Variables
 
@@ -409,10 +409,10 @@ No manual token generation needed — the authentication collection handles ever
 | `test_customer_mobile` | `9876543210` |
 | `test_barber_mobile` | `9876543211` |
 | `test_otp` | `123456` |
-| `customer_access_token` | *(auto-set by 01-authentication.json)* |
-| `customer_refresh_token` | *(auto-set by 01-authentication.json)* |
-| `barber_access_token` | *(auto-set by 01-authentication.json)* |
-| `barber_refresh_token` | *(auto-set by 01-authentication.json)* |
+| `customer_access_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
+| `customer_refresh_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
+| `barber_access_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
+| `barber_refresh_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
 | `customer_onboarding_token` | *(auto-set by 01-authentication.json)* |
 | `barber_onboarding_token` | *(auto-set by 01-authentication.json)* |
 
@@ -421,9 +421,9 @@ No manual token generation needed — the authentication collection handles ever
 | # | Method | Endpoint | Description |
 |---|---|---|---|
 | 1 | POST | `/api/v1/auth/otp/send` | Send OTP to customer |
-| 2 | POST | `/api/v1/auth/otp/verify` | Verify customer OTP — captures tokens |
+| 2 | POST | `/api/v1/auth/otp/verify` | Verify customer OTP - captures onboarding or session tokens |
 | 3 | POST | `/api/v1/auth/otp/send` | Send OTP to barber |
-| 4 | POST | `/api/v1/auth/otp/verify` | Verify barber OTP — captures tokens |
+| 4 | POST | `/api/v1/auth/otp/verify` | Verify barber OTP - captures onboarding or session tokens |
 | 5 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token |
 | 6 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token |
 | 7 | POST | `/api/v1/auth/logout` | Logout customer *(Terminal)* |
@@ -460,9 +460,9 @@ This script is the **source of truth** that generates all Postman JSON files. Ap
 | `bearerAuth('barber_firebase_token')` | `bearerAuth('barber_access_token')` |
 
 Also update:
-- Collection descriptions — remove Firebase references, use OTP/JWT descriptions from [§4](#4-update-collection-descriptions)
-- Pre-request scripts — replace `readScopedValue('customer_firebase_token')` / `readScopedValue('barber_firebase_token')` with access token equivalents
-- Environment variable definitions — replace Firebase token entries with OTP/JWT variables from [§1](#1-environment-file)
+- Collection descriptions - remove Firebase references, use OTP/JWT descriptions from [Section 4](#4-update-collection-descriptions)
+- Pre-request scripts - replace `readScopedValue('customer_firebase_token')` / `readScopedValue('barber_firebase_token')` with access token equivalents
+- Environment variable definitions - replace Firebase token entries with OTP/JWT variables from [Section 1](#1-environment-file)
 - **Onboarding Auth Token:** The `02-onboarding.json` collection needs to inject the `onboardingToken` into the Bearer token instead of the standard `accessToken`.
 - **Onboarding Response Capture:** Add a post-request script to `02-onboarding.json` requests to capture the newly returned `accessToken` and `refreshToken` and set them into the postman environment, overwriting any previous values and fully logging in the user after successful onboarding.
 
@@ -479,19 +479,19 @@ rg -n "firebase" postman-collections/    # must return zero matches
 
 ```text
 postman-collections/
-├── 01-authentication.json          ← REWRITE: OTP flow (9 requests)
-├── 02-onboarding.json              ← UPDATE: auth vars + descriptions
-├── 03-customer-profile.json        ← UPDATE: use customer_access_token
-├── 04-customer-bookings.json       ← UPDATE: use customer_access_token
-├── 05-customer-shop-discovery.json ← UPDATE: use customer_access_token
-├── 06-customer-ratings.json        ← UPDATE: use customer_access_token
-├── 07-barber-profile-shop.json     ← UPDATE: use barber_access_token + descriptions
-├── 08-barber-employees.json        ← UPDATE: use barber_access_token
-├── 09-barber-services.json         ← UPDATE: use barber_access_token
-├── 10-barber-bookings.json         ← UPDATE: use barber_access_token
-├── 11-barber-photos.json           ← UPDATE: use barber_access_token
-├── 12-barber-earnings.json         ← UPDATE: use barber_access_token
-├── 13-barber-ratings.json          ← UPDATE: use barber_access_token
+├── 01-authentication.json           ← REWRITE: OTP flow (9 requests)
+├── 02-onboarding.json               ← UPDATE: auth vars + descriptions
+├── 03-customer-profile.json         ← UPDATE: use customer_access_token
+├── 04-customer-bookings.json        ← UPDATE: use customer_access_token
+├── 05-customer-shop-discovery.json  ← UPDATE: use customer_access_token
+├── 06-customer-ratings.json         ← UPDATE: use customer_access_token
+├── 07-barber-profile-shop.json      ← UPDATE: use barber_access_token + descriptions
+├── 08-barber-employees.json         ← UPDATE: use barber_access_token
+├── 09-barber-services.json          ← UPDATE: use barber_access_token
+├── 10-barber-bookings.json          ← UPDATE: use barber_access_token
+├── 11-barber-photos.json            ← UPDATE: use barber_access_token
+├── 12-barber-earnings.json          ← UPDATE: use barber_access_token
+├── 13-barber-ratings.json           ← UPDATE: use barber_access_token
 ├── EverCut.postman_environment.json ← REWRITE: OTP + JWT variables only
-└── README.md                       ← REWRITE: setup, run order, variables
+└── README.md                        ← REWRITE: setup, run order, variables
 ```

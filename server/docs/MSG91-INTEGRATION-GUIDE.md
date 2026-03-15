@@ -34,8 +34,8 @@
 6. [User Model Changes](#6-user-model-changes)
    - [6.1 Remove `firebaseUid`](#61-remove-firebaseuid)
    - [6.2 Add `refreshTokenHash`](#62-add-refreshtokenhash)
-   - [6.3 Make `email` Optional + Add `emailVerified`](#63-make-email-optional--add-emailverified)
-   - [6.4 Change `roleType` Default to `PENDING`](#64-change-roletype-default-to-pending)
+   - [6.3 Maintain `email` as Required + Add `emailVerified`](#63-maintain-email-as-required--add-emailverified)
+   - [6.4 Remove `firebaseUid` logic, Keep `roleType` exact](#64-remove-firebaseuid-logic-keep-roletype-exact)
    - [6.5 Updated Indexes](#65-updated-indexes)
    - [6.6 Full Updated Schema Reference](#66-full-updated-schema-reference)
    - [6.7 User Repository Updates](#67-user-repository-updates)
@@ -83,17 +83,17 @@
 ─── New User ─────────────────────────────────────────────────────────
 1–6. Same as above
 7. OTP valid → no User found by phoneNumber
-8. **DO NOT create a User record**. Issue an internal short-lived `onboardingToken` (valid for 30m) containing only the `phoneNumber`.
+8. **DO NOT create a User record**. Issue an internal short-lived `onboardingToken` (valid for 30m) containing only the verified `phoneNumber`.
 9. Response: { isNewUser: true, onboardingToken }
 10. App navigates to onboarding screen
 11. App → POST /api/v1/onboarding/customers  (or /barbers)
         with header `Authorization: Bearer <onboardingToken>`
-12. Backend validates onboarding token, extracts `phoneNumber`, creates the User and Profile records simultaneously.
+12. `authenticateOnboarding` validates the `onboardingToken`, extracts `phoneNumber`, and the backend creates the User and Profile records simultaneously.
 13. Response returns the standard { user, profile, accessToken, refreshToken }.
 14. All subsequent requests use Bearer <accessToken>
 ```
 
-> **Why an Onboarding Token?** Previously, the flow created `PENDING` users with optional emails, leading to a database full of abandoned, incomplete accounts ("zombie users") if they dropped off at the onboarding screen. By using a secure JWT `onboardingToken`, we pass the verified phone number state safely to the onboarding endpoint without muddying the database. Weakening constraints like making `email` optional is poor practice.
+> **Why an Onboarding Token?** Previously, the flow created placeholder pre-onboarding users with incomplete identity data, leading to a database full of abandoned accounts ("zombie users") if they dropped off at the onboarding screen. By using a secure JWT `onboardingToken`, we pass the verified phone number state safely to the onboarding endpoint without muddying the database. Weakening constraints like making `email` optional is poor practice.
 
 ### 1.2 Layer Mapping
 
@@ -105,9 +105,9 @@
 | **Validator** | `validators/auth.validator.js` — **REWRITE** with OTP schemas |
 | **Controller** | `controllers/auth.controller.js` — **REWRITE** with OTP + token handlers |
 | **Route** | `routes/auth.routes.js` — **REWRITE** with OTP + token routes |
-| **Middleware** | `middleware/authenticate.middleware.js` — **REWRITE** for JWT-only; `middleware/otp-rate-limiter.middleware.js` — **NEW** |
-| **Model** | `models/user.model.js` — remove `firebaseUid`; add `refreshTokenHash`, `emailVerified`; make `email` optional; change `roleType` default to `PENDING` |
-| **Constants** | `utils/constants.js` — add `PENDING` role, OTP + token type constants |
+| **Middleware** | `middleware/authenticate.middleware.js` — **REWRITE** to export `authenticate` and `authenticateOnboarding` from the same file; `middleware/otp-rate-limiter.middleware.js` — **NEW** |
+| **Model** | `models/user.model.js` — remove `firebaseUid`; add `refreshTokenHash`, `emailVerified`; keep `roleType` aligned to final persisted roles |
+| **Constants** | `utils/constants.js` — keep existing roles; add OTP + token type constants |
 
 ---
 
@@ -123,17 +123,12 @@ Remove all `FIREBASE_*` variables and add:
 # ── MSG91 (OTP / SMS) ───────────────────────────────────────────────
 MSG91_AUTH_KEY=your_msg91_auth_key
 MSG91_OTP_TEMPLATE_ID=your_otp_template_id
-MSG91_OTP_LENGTH=6
-MSG91_OTP_EXPIRY=10
-# Set to "true" in development to skip real SMS and accept test OTP
-MSG91_TEST_MODE=false
-MSG91_TEST_OTP=123456
 
 # ── JWT (Custom Token Auth) ─────────────────────────────────────────
 JWT_ACCESS_SECRET=your_access_token_secret_min_64_chars_random
 JWT_REFRESH_SECRET=your_refresh_token_secret_min_64_chars_different
 JWT_ACCESS_EXPIRY=15m
-JWT_REFRESH_EXPIRY=30d
+JWT_REFRESH_EXPIRY=180d
 ```
 
 ### 2.2 Update `config/index.js`
@@ -145,10 +140,10 @@ Remove the entire `firebase` config block and add:
 msg91: Object.freeze({
     authKey: requireEnv('MSG91_AUTH_KEY'),
     otpTemplateId: requireEnv('MSG91_OTP_TEMPLATE_ID'),
-    otpLength: parseInt(optionalEnv('MSG91_OTP_LENGTH', '6'), 10),
-    otpExpiry: parseInt(optionalEnv('MSG91_OTP_EXPIRY', '10'), 10),
-    testMode: optionalEnv('MSG91_TEST_MODE', 'false') === 'true',
-    testOtp: optionalEnv('MSG91_TEST_OTP', '123456'),
+    otpLength: 6,
+    otpExpiry: 10,                                              // minutes
+    testMode: process.env.NODE_ENV !== 'production' && false,   // flip to true in dev to skip real SMS
+    testOtp: '123456',
     baseUrl: 'https://control.msg91.com/api/v5',
 }),
 
@@ -157,7 +152,7 @@ jwt: Object.freeze({
     accessSecret: requireEnv('JWT_ACCESS_SECRET'),
     refreshSecret: requireEnv('JWT_REFRESH_SECRET'),
     accessExpiry: optionalEnv('JWT_ACCESS_EXPIRY', '15m'),
-    refreshExpiry: optionalEnv('JWT_REFRESH_EXPIRY', '30d'),
+    refreshExpiry: optionalEnv('JWT_REFRESH_EXPIRY', '180d'),
 }),
 ```
 
@@ -186,8 +181,7 @@ npm uninstall firebase-admin
 **File:** `src/utils/constants.js` — Add:
 
 ```javascript
-// ── Roles (update existing) ─────────────────────────────────────────
-// Add PENDING to the existing ROLES object:
+// ── Roles (keep existing) ───────────────────────────────────────────
 export const ROLES = Object.freeze({
     CUSTOMER: 'CUSTOMER',
     BARBER: 'BARBER',
@@ -196,11 +190,10 @@ export const ROLES = Object.freeze({
 
 export const ALL_ROLES = Object.values(ROLES);
 
-// ── OTP ─────────────────────────────────────────────────────────────
-export const OTP_LENGTH = 6;
-export const OTP_EXPIRY_MINUTES = 10;
-export const OTP_MAX_ATTEMPTS = 5;
-export const OTP_RESEND_COOLDOWN_SEC = 30;
+// ── OTP Rate Limiting ──────────────────────────────────────────────
+// Used by otp-rate-limiter.middleware.js.
+// OTP length and expiry are configured via config.msg91 (env vars),
+// not duplicated here.
 export const OTP_RATE_LIMIT = Object.freeze({
     windowMs: 15 * 60 * 1000,   // 15 minutes
     maxSendPerPhone: 5,
@@ -208,9 +201,9 @@ export const OTP_RATE_LIMIT = Object.freeze({
     maxVerifyPerPhone: 10,
 });
 
-// ── Token Types ─────────────────────────────────────────────────────
+// ── Token Types ──────────────────────────────────────────────────────────────
 export const TOKEN_TYPE = Object.freeze({
-    ONBOARDING: 'onboarding', // ← NEW — given after OTP, required for profile creation
+    ONBOARDING: 'onboarding',
     ACCESS: 'access',
     REFRESH: 'refresh',
 });
@@ -378,48 +371,18 @@ export const resendOtp = async (mobile, retryType = 'text') => {
 
 ```javascript
 import * as smsProvider from './sms-provider.service.js';
-import { BadRequestError, TooManyRequestsError } from '../utils/api-error.js';
-import { OTP_RATE_LIMIT } from '../utils/constants.js';
+import { BadRequestError } from '../utils/api-error.js';
 import logger from '../utils/logger.js';
 
 /**
- * In-memory rate limit store. For production at scale, replace with Redis.
- * Structure: Map<key, { count, resetAt }>
+ * OTP Service — orchestrates OTP operations via the SMS provider.
+ *
+ * Rate limiting is handled by the `otp-rate-limiter.middleware.js` at the route
+ * level. This service focuses purely on business logic.
  */
-const rateLimitStore = new Map();
-
-const checkRateLimit = (key, maxAttempts) => {
-    const now = Date.now();
-    const entry = rateLimitStore.get(key);
-
-    if (!entry || now > entry.resetAt) {
-        rateLimitStore.set(key, { count: 1, resetAt: now + OTP_RATE_LIMIT.windowMs });
-        return;
-    }
-
-    if (entry.count >= maxAttempts) {
-        const retryAfterSec = Math.ceil((entry.resetAt - now) / 1000);
-        throw new TooManyRequestsError(
-            `Too many attempts. Please try again after ${retryAfterSec} seconds.`,
-        );
-    }
-
-    entry.count += 1;
-};
-
-// Periodic cleanup (every 5 minutes)
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of rateLimitStore) {
-        if (now > entry.resetAt) rateLimitStore.delete(key);
-    }
-}, 5 * 60 * 1000).unref();
 
 /** Request OTP for a mobile number. */
-export const requestOtp = async (mobile, clientIp) => {
-    checkRateLimit(`send:phone:${mobile}`, OTP_RATE_LIMIT.maxSendPerPhone);
-    checkRateLimit(`send:ip:${clientIp}`, OTP_RATE_LIMIT.maxSendPerIp);
-
+export const requestOtp = async (mobile) => {
     const result = await smsProvider.sendOtp(mobile);
     if (!result.success) {
         throw new BadRequestError('Failed to send OTP. Please try again.');
@@ -428,9 +391,7 @@ export const requestOtp = async (mobile, clientIp) => {
 };
 
 /** Verify OTP for a mobile number. */
-export const verifyOtp = async (mobile, otp, clientIp) => {
-    checkRateLimit(`verify:phone:${mobile}`, OTP_RATE_LIMIT.maxVerifyPerPhone);
-
+export const verifyOtp = async (mobile, otp) => {
     const result = await smsProvider.verifyOtp(mobile, otp);
     if (!result.success) {
         throw new BadRequestError(result.message || 'Invalid or expired OTP');
@@ -439,10 +400,7 @@ export const verifyOtp = async (mobile, otp, clientIp) => {
 };
 
 /** Resend OTP via alternative channel. */
-export const resendOtp = async (mobile, retryType, clientIp) => {
-    checkRateLimit(`send:phone:${mobile}`, OTP_RATE_LIMIT.maxSendPerPhone);
-    checkRateLimit(`send:ip:${clientIp}`, OTP_RATE_LIMIT.maxSendPerIp);
-
+export const resendOtp = async (mobile, retryType) => {
     const result = await smsProvider.resendOtp(mobile, retryType);
     if (!result.success) {
         throw new BadRequestError('Failed to resend OTP. Please try again.');
@@ -472,31 +430,26 @@ import logger from '../utils/logger.js';
 
 // ── Token generation ──────────────────────────────────────────────────
 
-/** Generate a pair of access + refresh tokens. */
+/** Generate a short-lived onboarding token. */
 export const generateOnboardingToken = (phoneNumber) => {
     return jwt.sign(
-        { sub: phoneNumber, type: TOKEN_TYPE.ONBOARDING },
+        {
+            sub: phoneNumber,
+            type: TOKEN_TYPE.ONBOARDING,
+        },
         config.jwt.accessSecret,
         { expiresIn: '30m' }
     );
 };
 
-export const verifyOnboardingToken = (token) => {
-    try {
-        const decoded = jwt.verify(token, config.jwt.accessSecret);
-        if (decoded.type !== TOKEN_TYPE.ONBOARDING) {
-            throw new UnauthorizedError('Invalid token type for onboarding');
-        }
-        return decoded;
-    } catch {
-        throw new UnauthorizedError('Invalid or expired onboarding token');
-    }
-};
-
 /** Generate a pair of access + refresh tokens. */
 export const generateTokenPair = (userId, roleType) => {
     const accessToken = jwt.sign(
-        { sub: userId.toString(), role: roleType, type: TOKEN_TYPE.ACCESS },
+        {
+            sub: userId.toString(),
+            role: roleType,
+            type: TOKEN_TYPE.ACCESS,
+        },
         config.jwt.accessSecret,
         { expiresIn: config.jwt.accessExpiry },
     );
@@ -510,17 +463,17 @@ export const generateTokenPair = (userId, roleType) => {
     return { accessToken, refreshToken };
 };
 
-/** Verify an access token and return decoded payload. */
-export const verifyAccessToken = (token) => {
+/** Verify a bearer token signed with the access secret. */
+export const verifyBearerToken = (token) => {
     try {
         const decoded = jwt.verify(token, config.jwt.accessSecret);
-        if (decoded.type !== TOKEN_TYPE.ACCESS) {
+        if (![TOKEN_TYPE.ACCESS, TOKEN_TYPE.ONBOARDING].includes(decoded.type)) {
             throw new UnauthorizedError('Invalid token type');
         }
         return decoded;
     } catch (err) {
         if (err instanceof UnauthorizedError) throw err;
-        throw new UnauthorizedError('Invalid or expired access token');
+        throw new UnauthorizedError('Invalid or expired token');
     }
 };
 
@@ -548,13 +501,13 @@ export const hashToken = (token) => {
  * Resolve user session after OTP verification.
  *
  * - **Existing user:** update lastLoginAt, issue tokens, load profile.
- * - **New user:** issues an `onboardingToken` (valid 30 mins, contains only the phone number).
- *   The client proceeds to onboarding and passes this token to authenticate.
+ * - **New user:** issues a short-lived `onboardingToken` (valid 30 mins, contains only the phone number).
+ *   The client proceeds to onboarding and passes this token to `authenticate`.
  *
  * We DO NOT create a database record for incomplete user profiles.
  *
  * @param {string} phoneNumber — verified phone number (10-digit)
- * @returns {{ isNewUser: boolean, user: object, profile?: object, tokens: object }}
+ * @returns {{ isNewUser: boolean, user?: object, profile?: object, tokens?: object, onboardingToken?: string }}
  */
 export const resolveOtpSession = async (phoneNumber) => {
     const formattedPhone = phoneNumber.startsWith('+91')
@@ -578,7 +531,7 @@ export const resolveOtpSession = async (phoneNumber) => {
             const shop = await shopRepository.findByOwnerId(existingUser._id);
             if (shop) {
                 const photos = await photoRepository.findByShopId(shop._id, {});
-                profile = serializeBarberProfile(shop, { photos });
+                profile = serializeBarberProfile(shop, existingUser, { photos });
             }
         }
         return { isNewUser: false, user: existingUser, profile, tokens };
@@ -599,7 +552,8 @@ export const refreshAccessToken = async (refreshToken) => {
     const decoded = verifyRefreshToken(refreshToken);
     const userId = decoded.sub;
 
-    const user = await userRepository.findById(userId);
+    // Must use findByIdWithRefreshHash because refreshTokenHash has select: false
+    const user = await userRepository.findByIdWithRefreshHash(userId);
     if (!user || !user.isActive || user.deletedAt) {
         throw new UnauthorizedError('Account is inactive or deleted');
     }
@@ -747,7 +701,7 @@ import { ApiResponse } from '../utils/api-response.js';
 export const sendOtp = async (req, res, next) => {
     try {
         const { mobile } = req.body;
-        const result = await otpService.requestOtp(mobile, req.ip);
+        const result = await otpService.requestOtp(mobile);
         return res.status(200).json(ApiResponse.success(result, 'OTP sent successfully'));
     } catch (err) { next(err); }
 };
@@ -756,7 +710,7 @@ export const sendOtp = async (req, res, next) => {
 export const verifyOtp = async (req, res, next) => {
     try {
         const { mobile, otp } = req.body;
-        await otpService.verifyOtp(mobile, otp, req.ip);
+        await otpService.verifyOtp(mobile, otp);
         const session = await authService.resolveOtpSession(mobile);
 
         let responseData;
@@ -775,7 +729,6 @@ export const verifyOtp = async (req, res, next) => {
             };
         }
 
-
         const message = session.isNewUser
             ? 'OTP verified. Please complete your profile.'
             : 'Login successful';
@@ -788,7 +741,7 @@ export const verifyOtp = async (req, res, next) => {
 export const resendOtp = async (req, res, next) => {
     try {
         const { mobile, retryType } = req.body;
-        const result = await otpService.resendOtp(mobile, retryType, req.ip);
+        const result = await otpService.resendOtp(mobile, retryType);
         return res.status(200).json(ApiResponse.success(result, result.message));
     } catch (err) { next(err); }
 };
@@ -863,51 +816,85 @@ export default router;
 
 > **Route index:** No changes needed to `src/routes/index.js` — auth routes are already mounted at `/auth`.
 
+**Onboarding route wiring:** Update `src/routes/onboarding.routes.js` to import `authenticateOnboarding` (instead of `authenticate`) and use it on both onboarding endpoints:
+
+```diff
+- import authenticate from '../middleware/authenticate.middleware.js';
++ import { authenticateOnboarding } from '../middleware/authenticate.middleware.js';
+
+  router.post(
+      '/customers',
+-     authenticate,
++     authenticateOnboarding,
+      uploadCustomerPhoto,
+      validate(customerOnboardingSchema, 'body'),
+      onboardingController.createCustomerOnboarding,
+  );
+
+  router.post(
+      '/barbers',
+-     authenticate,
++     authenticateOnboarding,
+      uploadBarberOnboardingImages,
+      validate(barberOnboardingSchema, 'body'),
+      onboardingController.createBarberOnboarding,
+  );
+```
+
+> Keep `authenticate` (default export) for access-token routes such as `/auth/logout` and the authenticated customer/barber route groups.
+
 ---
 
 ### 4.9 Authenticate Middleware
 
-**File:** `src/middleware/authenticate.middleware.js` — **REWRITE** (JWT-only, fully replaces the Firebase `verifyIdToken` implementation):
+**Best approach:** Keep both auth checks in the same middleware file, but split them into two explicit exports:
+- `authenticate` accepts only `TOKEN_TYPE.ACCESS` and populates `req.user`
+- `authenticateOnboarding` accepts only `TOKEN_TYPE.ONBOARDING` and populates `req.onboardingContext`
+- Refresh tokens are always rejected by both
+
+This keeps normal logged-in routes safe by default while still avoiding a second middleware file.
+
+**File:** `src/middleware/authenticate.middleware.js` — **REWRITE** (JWT-based auth, fully replaces the Firebase `verifyIdToken` implementation and exports both access-route and onboarding-route middleware):
 
 ```javascript
 import * as authService from '../services/auth.service.js';
 import userRepository from '../repositories/user.repository.js';
 import { UnauthorizedError } from '../utils/api-error.js';
 import logger from '../utils/logger.js';
+import { TOKEN_TYPE } from '../utils/constants.js';
 
 /**
- * Authenticate middleware — verifies JWT access token.
- *
- * The onboarding Token is explicitly rejected by this middleware.
- *
- * On success, attaches to `req.user`:
- *   - _id            (MongoDB ObjectId)
- *   - roleType       ('PENDING' | 'CUSTOMER' | 'BARBER' | 'ADMIN')
- *   - phoneNumber
- *   - email          (may be null for PENDING users)
- *   - emailVerified  (boolean)
+ * Shared bearer-token extraction for both auth modes.
  */
-const authenticate = async (req, _res, next) => {
+const extractBearerToken = (req, missingMessage) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+        throw new UnauthorizedError(missingMessage);
+    }
+
+    const token = authHeader.split(' ')[1];
+    if (!token) throw new UnauthorizedError(missingMessage);
+    return token;
+};
+
+const loadActiveUser = async (userId) => {
+    const user = await userRepository.findById(userId);
+    if (!user || user.deletedAt || user.isActive === false) {
+        throw new UnauthorizedError('Account is inactive or deleted');
+    }
+    return user;
+};
+
+export const authenticate = async (req, _res, next) => {
     try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader?.startsWith('Bearer ')) {
-            throw new UnauthorizedError('No token provided');
+        const token = extractBearerToken(req, 'No token provided');
+        const decoded = authService.verifyBearerToken(token);
+
+        if (decoded.type !== TOKEN_TYPE.ACCESS) {
+            throw new UnauthorizedError('Standard account access token required');
         }
 
-        const token = authHeader.split(' ')[1];
-        if (!token) throw new UnauthorizedError('No token provided');
-
-        const decoded = authService.verifyAccessToken(token);
-
-        if (decoded.type === TOKEN_TYPE.ONBOARDING) {
-             throw new UnauthorizedError('Onboarding token cannot be used for standard API access');
-        }
-
-        const user = await userRepository.findById(decoded.sub);
-
-        if (!user || user.deletedAt || user.isActive === false) {
-            throw new UnauthorizedError('Account is inactive or deleted');
-        }
+        const user = await loadActiveUser(decoded.sub);
 
         req.user = {
             _id: user._id,
@@ -925,42 +912,28 @@ const authenticate = async (req, _res, next) => {
     }
 };
 
-export default authenticate;
-```
-
-**File:** `src/middleware/authenticate-onboarding.middleware.js` — **NEW**
-
-```javascript
-import * as authService from '../services/auth.service.js';
-import { UnauthorizedError } from '../utils/api-error.js';
-import logger from '../utils/logger.js';
-
-/**
- * Middleware for onboarding endpoints.
- * Validates the temporary onboarding token and extracts the verified phone number.
- */
 export const authenticateOnboarding = async (req, _res, next) => {
     try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader?.startsWith('Bearer ')) {
-            throw new UnauthorizedError('No onboarding token provided');
+        const token = extractBearerToken(req, 'No token provided');
+        const decoded = authService.verifyBearerToken(token);
+
+        if (decoded.type !== TOKEN_TYPE.ONBOARDING) {
+            throw new UnauthorizedError('Onboarding token required');
         }
 
-        const token = authHeader.split(' ')[1];
-        if (!token) throw new UnauthorizedError('No onboarding token provided');
-
-        const decoded = authService.verifyOnboardingToken(token);
-        
         req.onboardingContext = {
             phoneNumber: decoded.sub,
         };
 
         next();
     } catch (err) {
-        logger.warn('Onboarding token verification failed', { error: err.message });
-        next(new UnauthorizedError('Invalid or expired onboarding token. Please verify OTP again.'));
+        if (err instanceof UnauthorizedError) return next(err);
+        logger.warn('Token verification failed', { error: err.message });
+        next(new UnauthorizedError('Invalid or expired token'));
     }
 };
+
+export default authenticate;
 ```
 
 ---
@@ -970,15 +943,15 @@ export const authenticateOnboarding = async (req, _res, next) => {
 | Aspect | Value | Rationale |
 |---|---|---|
 | **Access Token Expiry** | 15 minutes | Short-lived to minimize attack window |
-| **Refresh Token Expiry** | 30 days | Avoids frequent re-authentication for mobile users |
+| **Refresh Token Expiry** | 180 days (6 months) | Avoids frequent re-authentication for mobile users |
 | **Signing Algorithm** | HS256 (HMAC-SHA256) | Sufficient for single-backend apps |
 | **Storage (Client)** | Secure storage (Keychain/Keystore) | Never in plain localStorage on web |
 | **Storage (Server)** | SHA-256 hash in User model | Never store raw refresh tokens |
 | **Rotation** | Every refresh issues new pair | Detects token theft via hash mismatch |
 | **Revocation** | Set `refreshTokenHash` to null | Immediate logout / sign-out-everywhere |
-| **PENDING Users** | Receive same token pair | Required to access onboarding endpoints |
+| **Onboarding Tokens** | Short-lived onboarding token | Used only for onboarding endpoints |
 
-> **Token Payload — `role` field:** The JWT `role` field reflects the user's current `roleType` at issuance time. For new users, this will be `'PENDING'`. After onboarding completes and the user's `roleType` is updated to `CUSTOMER`/`BARBER`, the **next token refresh** will reflect the updated role. The `authenticate` middleware always reads the role from the DB (not from the token), so the authorization layer is always current.
+> **Token Payload — `role` field:** Standard access tokens reflect the persisted user's current `roleType` at issuance time. Brand-new users do not receive a pseudo-user role; they receive an `onboardingToken` that carries only the verified phone number needed to finish onboarding.
 
 ---
 
@@ -1041,7 +1014,7 @@ emailVerified: {
   },
 ```
 
-> **No PENDING role:** With the adoption of the `onboardingToken`, users are explicitly created directly as `CUSTOMER` or `BARBER` during the onboarding process. The enum `{ CUSTOMER, BARBER, ADMIN }` remains untouched.
+> **Roles remain exact:** Users are created directly as `CUSTOMER` or `BARBER` during onboarding. The enum `{ CUSTOMER, BARBER, ADMIN }` remains untouched.
 
 ### 6.5 Updated Indexes
 
@@ -1097,7 +1070,8 @@ const userSchema = new mongoose.Schema(
 );
 
 // Indexes
-userSchema.index({ email: 1 }, { unique: true });
+// Note: phoneNumber and email already have unique indexes from the `unique: true` field option.
+// Only add compound indexes that are not automatically created.
 userSchema.index({ roleType: 1, isActive: 1 });
 ```
 
@@ -1152,7 +1126,9 @@ rm firebase-admin-sdk.json
 + import { revokeRefreshToken } from './auth.service.js';
 ```
 
-**Remove** the `cleanupFirebaseAccess` function entirely.
+**Remove** the `cleanupFirebaseAccess` function entirely — there is no Firebase to clean up.
+
+> **Why:** The existing `cleanupFirebaseAccess` revoked Firebase tokens **and** disabled the Firebase user. With JWT-based auth, revoking the refresh token is the complete equivalent. There is no external identity provider to clean up.
 
 **Replace `signOutEverywhere`** — signature changes from `firebaseUid` to `userId`:
 
@@ -1183,7 +1159,7 @@ rm firebase-admin-sdk.json
 
 **File:** `src/controllers/onboarding.controller.js`
 
-> **Key change:** Replace `firebaseUid` logic with the validated `phoneNumber` obtained from the `req.onboardingContext`. The `authenticateOnboarding` middleware verifies the onboarding token and decodes the phone number. Furthermore, the newly created `accessToken` and `refreshToken` generated by the Auth Service are attached to the response.
+> **Key change:** Replace `firebaseUid` logic with the validated `phoneNumber` obtained from `req.onboardingContext`. Onboarding routes now use `authenticateOnboarding` from the same middleware file, which accepts only onboarding tokens and populates `req.onboardingContext`. Furthermore, the newly created `accessToken` and `refreshToken` generated by the Auth Service are attached to the response.
 
 ```diff
   export const createCustomerOnboarding = async (req, res, next) => {
@@ -1192,7 +1168,9 @@ rm firebase-admin-sdk.json
 -         const result = await onboardingService.createCustomerOnboarding(firebaseUid, req.body, req.file);
 +         const { phoneNumber } = req.onboardingContext;
 +         const result = await onboardingService.createCustomerOnboarding(phoneNumber, req.body, req.file);
-+         return res.status(201).json(ApiResponse.success(result, 'Customer profile created'));
+          return res.status(201).json(ApiResponse.success(result, 'Customer profile created'));
+      } catch (err) { next(err); }
+  };
 
   export const createBarberOnboarding = async (req, res, next) => {
       try {
@@ -1200,8 +1178,12 @@ rm firebase-admin-sdk.json
 -         const result = await onboardingService.createBarberOnboarding(firebaseUid, req.user, req.body, req.files);
 +         const { phoneNumber } = req.onboardingContext;
 +         const result = await onboardingService.createBarberOnboarding(phoneNumber, req.body, req.files);
-+         return res.status(201).json(ApiResponse.success(result, 'Barber profile created'));
+          return res.status(201).json(ApiResponse.success(result, 'Barber profile created'));
+      } catch (err) { next(err); }
+  };
 ```
+
+> **Response format:** The onboarding services now return `{ user, profile, tokens }` (customer) or `{ user, shop, photos, tokens }` (barber). The tokens are included in the response data so the client can immediately authenticate after onboarding.
 
 ### 7.4 Refactor Onboarding Service
 
@@ -1244,6 +1226,10 @@ import * as authService from './auth.service.js';
 export const createCustomerOnboarding = async (phoneNumber, profileData, file) => {
     if (!file) throw new BadRequestError('Profile photo is required');
 
+    // Guard against race condition: reject if phone already taken
+    const existingUser = await userRepository.findByPhone(phoneNumber);
+    if (existingUser) throw new ConflictError('User already exists');
+
     await ensureUniqueUserIdentity({
         email: profileData.email,
         phoneNumber: phoneNumber,
@@ -1272,19 +1258,25 @@ export const createCustomerOnboarding = async (phoneNumber, profileData, file) =
 
 #### 7.4.3 Update `createBarberOnboarding`
 
-Identical logic wrapper mapping the `phoneNumber` verification and returning full session tokens.
+The function signature changes from `(firebaseUid, authUser, shopData, files)` to `(phoneNumber, shopData, files)`. `normalizeBarberOnboardingInput(authUser, shopData)` currently reads `authUser.phoneNumber` and `authUser.email`, so we pass a synthetic context object that carries the verified phone number. The email still comes from `shopData`.
 
 ```javascript
 export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
-    // We pass phoneNumber explicitly, so we override the normalizeBarberOnboardingInput requirement of authUser.
-    const normalized = normalizeBarberOnboardingInput({ phoneNumber }, shopData);
-    
+    // Build a minimal authUser-like object for normalizeBarberOnboardingInput,
+    // which reads authUser.phoneNumber and (optionally) authUser.email.
+    const authContext = { phoneNumber, email: null };
+    const normalized = normalizeBarberOnboardingInput(authContext, shopData);
+
+    // Guard against race condition: reject if phone already taken
+    const existingUser = await userRepository.findByPhone(normalized.phoneNumber);
+    if (existingUser) throw new ConflictError('Barber already exists');
+
     await ensureUniqueUserIdentity({
         email: normalized.email,
         phoneNumber: normalized.phoneNumber,
     });
 
-    // ... Validation and Image Handlers ...
+    // ... Validation and Image Handlers (unchanged) ...
 
     const user = await userRepository.create({
         phoneNumber: normalized.phoneNumber,
@@ -1301,7 +1293,7 @@ export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
     const refreshHash = authService.hashToken(tokens.refreshToken);
     await userRepository.updateById(user._id, { refreshTokenHash: refreshHash });
 
-    return { user, shop: serializeBarberProfile(createdShop, { photos }), photos, tokens };
+    return { user, shop: serializeBarberProfile(createdShop, user, { photos }), photos, tokens };
 };
 ```
 
@@ -1309,7 +1301,7 @@ export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
 
 **File:** `src/validators/onboarding.validator.js`
 
-Remove `phoneNumber` from onboarding schemas — it's already verified and stored on the user from OTP:
+Remove `phoneNumber` from the **customer** onboarding schema — it's already verified and stored from OTP:
 
 ```diff
   export const customerOnboardingSchema = Joi.object({
@@ -1318,13 +1310,9 @@ Remove `phoneNumber` from onboarding schemas — it's already verified and store
       firstName: Joi.string().trim().min(1).max(50).required(),
       // ... rest unchanged ...
   });
-
-  export const barberOnboardingSchema = Joi.object({
--     phoneNumber: Joi.string(),
-      email: Joi.string().email(),
-      // ... rest unchanged ...
-  });
 ```
+
+> **Note:** The barber onboarding schema does not have a `phoneNumber` field, so no change is needed there.
 
 > **Rationale:** The phone number is already verified during OTP and securely passed as part of the `onboardingToken`. Accepting it again from the form body is redundant and introduces a trust gap (the client could submit a different number). The service accesses the verified number from `req.onboardingContext.phoneNumber` exclusively.
 
@@ -1344,9 +1332,11 @@ Remove `findByFirebaseUid` (already documented in [§6.7](#67-user-repository-up
 
 **File:** `src/middleware/upload.middleware.js`
 
+The `resolveActorKey` function must handle both authenticated users (`req.user`) and onboarding users (`req.onboardingContext`). During onboarding, `req.user` is not set — only `req.onboardingContext.phoneNumber` is available.
+
 ```diff
 - const resolveActorKey = (req) => req.user?._id?.toString() || req.user?.firebaseUid || 'anonymous';
-+ const resolveActorKey = (req) => req.user?._id?.toString() || 'anonymous';
++ const resolveActorKey = (req) => req.user?._id?.toString() || req.onboardingContext?.phoneNumber || 'anonymous';
 ```
 
 ### 7.7 Clean Up Model Comments
@@ -1365,7 +1355,9 @@ Remove historical `firebaseUid` comments from these files:
 
 **File:** `src/middleware/authorize.middleware.js`
 
-The authorize middleware currently checks `req.user.isNewUser` — a flag that was set by the old Firebase authenticate middleware for users not yet in the DB. Since we now use the `onboardingToken` for un-profiled users, any request reaching here with an access token is guaranteed to have a valid role in DB. Simply remove the obsolete `isNewUser` check:
+In the new design, `authenticate` is used only on routes that require a fully onboarded user. That means `authorize()` can return to being a pure role-checking middleware, while onboarding routes use `authenticateOnboarding` and do not call `authorize()` at all.
+
+**Remove the `isNewUser` guard** — new users no longer have access tokens (they have onboarding tokens which are rejected by `authenticate`), so this check is unreachable and unnecessary:
 
 ```diff
   export const authorize = (...allowedRoles) => {
@@ -1373,12 +1365,12 @@ The authorize middleware currently checks `req.user.isNewUser` — a flag that w
           if (!req.user) {
               return next(new UnauthorizedError('Authentication required'));
           }
-
+-
 -         if (req.user.isNewUser) {
--             // PENDING users can only access onboarding endpoints
+-             // New users can only access auth/registration endpoints
 -             return next(new ForbiddenError('Please complete your profile first'));
 -         }
-
+-
           if (!allowedRoles.includes(req.user.roleType)) {
               return next(
                   new ForbiddenError(
@@ -1392,7 +1384,7 @@ The authorize middleware currently checks `req.user.isNewUser` — a flag that w
   };
 ```
 
-> **Onboarding routes** use `authenticateOnboarding`. All other route groups (customer, barber) use standard token authentication + `authorize(ROLES.CUSTOMER)` or `authorize(ROLES.BARBER)`.
+> **Onboarding routes** use `authenticateOnboarding` and then read `req.onboardingContext`. Customer/barber route groups continue to use `authenticate` plus `authorize(ROLES.CUSTOMER)` or `authorize(ROLES.BARBER)`. Logged-in non-role routes such as logout use `authenticate` only.
 
 ### 7.9 Clean Up Scripts
 
@@ -1504,7 +1496,7 @@ All errors follow the existing `AppError` hierarchy:
 | Invalid refresh token | `UnauthorizedError` | 401 | "Invalid or expired refresh token" |
 | Refresh token mismatch | `UnauthorizedError` | 401 | "Session invalidated" |
 | Inactive/deleted account | `UnauthorizedError` | 401 | "Account is inactive or deleted" |
-| PENDING user accessing non-onboarding route | `ForbiddenError` | 403 | "Please complete your profile first" |
+| Onboarding token used on standard API route | `UnauthorizedError` | 401 | "Onboarding token cannot be used for standard API access" |
 | Already-onboarded user attempting onboarding | `ConflictError` | 409 | "User is already onboarded" |
 
 ---
@@ -1559,14 +1551,16 @@ server/
     │   └── index.js                         ← REPLACE: firebase → msg91 + jwt config
     ├── controllers/
     │   ├── auth.controller.js               ← REWRITE: OTP + token + logout handlers
-    │   ├── onboarding.controller.js         ← REFACTOR: pass req.user (not firebaseUid/phoneNumber)
+    │   ├── onboarding.controller.js         ← REFACTOR: pass verified onboarding phoneNumber
+    │   │                                       from req.onboardingContext
     │   └── barber/
     │       └── barber-profile.controller.js  ← UPDATE: signOutEverywhere(req.user._id)
     ├── middleware/
-    │   ├── authenticate.middleware.js        ← REWRITE: JWT-only; includes emailVerified in req.user
-    │   ├── authorize.middleware.js           ← UPDATE: Remove obsolete isNewUser check
+    │   ├── authenticate.middleware.js        ← REWRITE: universal authenticate middleware;
+    │   │                                       populates req.user or req.onboardingContext by token type
+    │   ├── authorize.middleware.js           ← UPDATE: remove isNewUser check (no longer reachable)
     │   ├── otp-rate-limiter.middleware.js    ← NEW
-    │   └── upload.middleware.js              ← REMOVE: firebaseUid fallback
+    │   └── upload.middleware.js              ← UPDATE: replace firebaseUid fallback with onboardingContext
     ├── models/
     │   ├── user.model.js                    ← REMOVE: firebaseUid; ADD: refreshTokenHash, emailVerified;
     │   ├── shop.model.js                    ← REMOVE: Firebase comments
@@ -1576,23 +1570,22 @@ server/
     ├── repositories/
     │   └── user.repository.js               ← REMOVE: findByFirebaseUid(); ADD: findByIdWithRefreshHash()
     ├── routes/
-    │   └── auth.routes.js                   ← REWRITE: OTP + token + logout routes
+    │   ├── auth.routes.js                   ← REWRITE: OTP + token + logout 
+    │   └── onboarding.routes.js             ← UPDATE: use `authenticateOnboarding` middleware
     ├── services/
     │   ├── auth.service.js                  ← REWRITE: JWT tokens, OTP session (creates onboardingToken),
     │   │                                       refresh rotation
     │   ├── account.service.js               ← REFACTOR: remove firebase-admin, use JWT revocation
-    │   ├── onboarding.service.js            ← REFACTOR: receives phoneNumber, CREATES fully verified user
-    │   │                                       (instead of updating); ensureUniqueUserIdentity uses email/phone combo
-    │   ├── shop.service.js                  ← UPDATE: align business profile updates with final ownership boundaries
+    │   ├── onboarding.service.js            ← REFACTOR: receives phoneNumber, CREATES user + profile;
+    │   │                                       adds findByPhone guard + ensureUniqueUserIdentity
     │   ├── otp.service.js                   ← NEW
     │   └── sms-provider.service.js          ← NEW
     ├── utils/
-    │   ├── constants.js                     ← ADD: ONBOARDING token type, OTP + TOKEN_TYPE constants
+    │   ├── constants.js                     ← ADD: OTP_RATE_LIMIT, TOKEN_TYPE constants
     │   └── logger.js                        ← UPDATE: rename "Firebase private keys" comment
     └── validators/
         ├── auth.validator.js                ← REWRITE: OTP + token schemas
-        └── onboarding.validator.js          ← UPDATE: align onboarding payload validation
-                                                with the final request contracts
+        └── onboarding.validator.js          ← UPDATE: remove phoneNumber from customer schema
 ```
 
 ---
@@ -1610,28 +1603,25 @@ server/
 - [ ] `auth.service.js` fully rewritten — issues `onboardingToken` for new users, `accessToken` for returning
 - [ ] `auth.validator.js` rewritten with OTP/token schemas
 - [ ] `otp-rate-limiter.middleware.js` created
-- [ ] `auth.controller.js` rewritten — always returns tokens (new + returning users)
+- [ ] `auth.controller.js` rewritten — returns `onboardingToken` for new users, `accessToken`/`refreshToken` for returning users
 - [ ] `auth.routes.js` rewritten with all new routes
-- [ ] `authenticate.middleware.js` rewritten for JWT-only — explicit rejection of onboarding tokens
-- [ ] `authenticate-onboarding.middleware.js` added — valid onboarding tokens allowed
-- [ ] `authorize.middleware.js` updated — obsolete `isNewUser` check removed entirely
+- [ ] `onboarding.routes.js` updated — uses `authenticateOnboarding` for onboarding endpoints
+- [ ] `authenticate.middleware.js` rewritten — exports `authenticate` for fully onboarded routes and `authenticateOnboarding` for onboarding-only routes
+- [ ] `authorize.middleware.js` updated — pure role checks after `authenticate`
 - [ ] `user.model.js` changes applied:
   - [ ] `firebaseUid` removed
   - [ ] `refreshTokenHash` added (select: false)
   - [ ] `emailVerified` added (Boolean, default: false)
   - [ ] Keeps `email` strictly required and strictly unique
 - [ ] `user.repository.js` — `findByFirebaseUid()` removed, `findByIdWithRefreshHash()` added
-- [ ] `constants.js` updated — `ONBOARDING` token type added, OTP + TOKEN_TYPE constants
+- [ ] `constants.js` updated — `OTP_RATE_LIMIT` and `TOKEN_TYPE` constants added
 - [ ] `account.service.js` refactored to use JWT revocation
 - [ ] `onboarding.controller.js` refactored — relies on `req.onboardingContext.phoneNumber`
 - [ ] `onboarding.service.js` refactored — explicitly CREATES user upon completion of the profile
-- [ ] `onboarding.validator.js` — onboarding payload validation aligned with the final contracts
-- [ ] `shop.model.js` — schema aligned with the final entity boundaries
-- [ ] `shop.service.js` — business profile update handling aligned with the final ownership boundaries
-- [ ] `shop.validator.js` and `onboarding.validator.js` — validators aligned with the supported request fields
-- [ ] `barber-profile.utils.js` — serialization functions updated to join identity from `User` instead of `Shop`
+- [ ] `onboarding.validator.js` — `phoneNumber` removed from customer onboarding schema
+- [ ] `shop.model.js` — Firebase-related comments removed
+- [ ] `upload.middleware.js` — `resolveActorKey` updated to use `req.onboardingContext.phoneNumber` fallback
 - [ ] `barber-profile.controller.js` updated to pass `req.user._id` to `signOutEverywhere`
-- [ ] `upload.middleware.js` — `firebaseUid` fallback removed
 - [ ] Firebase-related model comments removed
 - [ ] Seed script updated to use `phoneNumber` identity
 - [ ] All OTP endpoints tested (test mode)
@@ -1674,3 +1664,4 @@ See **[`MSG91-POSTMAN-UPDATES-GUIDE.md`](./MSG91-POSTMAN-UPDATES-GUIDE.md)** for
 ---
 
 *This guide is designed for direct implementation within the EverCut `server/` codebase. Every code sample follows existing project conventions: ES Modules, Express 5 router patterns, Joi validation, the AppError/ApiResponse pattern, and the repository → service → controller → route layered architecture.*
+
