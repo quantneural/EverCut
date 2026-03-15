@@ -79,11 +79,8 @@ export const updateBusinessSchema = Joi.object({
     lastName: Joi.string().trim().min(1).max(50),
     gender: Joi.string().valid(...ALL_GENDERS),
     dateOfBirth: Joi.date(),
-    phoneNumber: Joi.string(),
     numberOfEmployees: Joi.number().integer().min(1),
     yearsOfExperience: Joi.number().integer().min(0),
-    email: Joi.string().email(),
-    emailId: Joi.string().email(),
     upiId: Joi.string(),
     upiAddress: Joi.string(),
     accountHolderName: Joi.string().trim().min(1).max(100),
@@ -128,7 +125,6 @@ export const updateBusinessSchema = Joi.object({
         value.ownerLastName = value.ownerLastName || value.lastName;
         value.ownerGender = value.ownerGender || value.gender;
         value.ownerDateOfBirth = value.ownerDateOfBirth || value.dateOfBirth;
-        value.emailId = value.emailId || value.email;
         value.upiId = value.upiId || value.upiAddress;
         value.address = value.address || value.shopLocation;
         value.category = value.category || value.shopCategory || value.businessCategory;

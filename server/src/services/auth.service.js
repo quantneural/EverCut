@@ -22,7 +22,7 @@ export const createSession = async (firebaseUid, authContext = {}) => {
             const shop = await shopRepository.findByOwnerId(existingUser._id);
             if (shop) {
                 const photos = await photoRepository.findByShopId(shop._id, {});
-                profile = serializeBarberProfile(shop, { photos });
+                profile = serializeBarberProfile(shop, existingUser, { photos });
             }
         }
 

@@ -3,7 +3,7 @@ import { ApiResponse } from '../../utils/api-response.js';
 
 export const getShopProfile = async (req, res, next) => {
     try {
-        const shop = await shopService.getShopByOwner(req.user._id);
+        const shop = await shopService.getShopByOwner(req.user._id, req.user);
         return res.status(200).json(ApiResponse.success(shop, 'Shop profile fetched'));
     } catch (err) {
         next(err);
@@ -12,7 +12,7 @@ export const getShopProfile = async (req, res, next) => {
 
 export const updateBusinessInfo = async (req, res, next) => {
     try {
-        const result = await shopService.updateBusinessInfo(req.user._id, req.body);
+        const result = await shopService.updateBusinessInfo(req.user._id, req.body, req.user);
         return res.status(200).json(ApiResponse.success(result, 'Business info updated'));
     } catch (err) {
         next(err);
@@ -30,7 +30,7 @@ export const getUpiDetails = async (req, res, next) => {
 
 export const updateUpiDetails = async (req, res, next) => {
     try {
-        const details = await shopService.updateUpiDetails(req.user._id, req.body);
+        const details = await shopService.updateUpiDetails(req.user._id, req.body, req.user);
         return res.status(200).json(ApiResponse.success(details, 'UPI details updated'));
     } catch (err) {
         next(err);

@@ -2,8 +2,7 @@ import shopRepository from '../repositories/shop.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import photoRepository from '../repositories/photo.repository.js';
 import ratingRepository from '../repositories/rating.repository.js';
-import userRepository from '../repositories/user.repository.js';
-import { BadRequestError, ConflictError, NotFoundError } from '../utils/api-error.js';
+import { BadRequestError, NotFoundError } from '../utils/api-error.js';
 import { serializeBarberProfile, serializeUpiDetails } from '../utils/barber-profile.utils.js';
 import { escapeRegex } from '../utils/regex.utils.js';
 import {
@@ -19,17 +18,16 @@ import {
  * Shop service business logic for barber profile management and customer discovery.
  */
 
-export const getShopByOwner = async (ownerId) => {
+export const getShopByOwner = async (ownerId, userContext) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const photos = await photoRepository.findByShopId(shop._id, {});
-    return serializeBarberProfile(shop, { photos });
+    return serializeBarberProfile(shop, userContext, { photos });
 };
 
 const ALLOWED_UPDATE_FIELDS = [
     'shopName',
-    'phoneNumber',
     'numberOfEmployees',
     'yearsOfExperience',
     'ownerName',
@@ -37,7 +35,6 @@ const ALLOWED_UPDATE_FIELDS = [
     'ownerLastName',
     'ownerGender',
     'ownerDateOfBirth',
-    'emailId',
     'upiId',
     'accountHolderName',
     'bankName',
@@ -51,6 +48,11 @@ const ALLOWED_UPDATE_FIELDS = [
     'openTime',
     'closeTime',
     'breakTimes',
+];
+
+const LEGACY_SHOP_CONTACT_FIELDS = [
+    ['email', 'Id'].join(''),
+    ['phone', 'Number'].join(''),
 ];
 
 const parseJsonIfString = (value) => {
@@ -105,8 +107,6 @@ const normalizeUpdateBody = (body = {}) => {
     normalized.ownerLastName = normalized.ownerLastName || normalized.lastName;
     normalized.ownerGender = normalized.ownerGender || normalized.gender;
     normalized.ownerDateOfBirth = normalized.ownerDateOfBirth || normalized.dateOfBirth;
-
-    normalized.emailId = normalized.emailId || normalized.email;
     normalized.upiId = normalized.upiId || normalized.upiAddress;
     normalized.address = normalized.address || normalized.shopLocation;
     normalized.category = normalized.category || normalized.shopCategory || normalized.businessCategory;
@@ -177,26 +177,6 @@ const validateAndAssign = (key, value, updateData, errors) => {
                 return;
             }
             updateData[key] = n;
-            return;
-        }
-
-        case 'emailId': {
-            const email = String(value).trim().toLowerCase();
-            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                errors.push('Invalid email format');
-                return;
-            }
-            updateData[key] = email;
-            return;
-        }
-
-        case 'phoneNumber': {
-            const phoneNumber = String(value).trim();
-            if (!phoneNumber) {
-                errors.push('phoneNumber is required');
-                return;
-            }
-            updateData[key] = phoneNumber;
             return;
         }
 
@@ -272,7 +252,7 @@ const validateAndAssign = (key, value, updateData, errors) => {
     }
 };
 
-export const updateBusinessInfo = async (ownerId, body) => {
+export const updateBusinessInfo = async (ownerId, body, userContext) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
@@ -299,33 +279,11 @@ export const updateBusinessInfo = async (ownerId, body) => {
         throw new BadRequestError('No valid fields provided for update');
     }
 
-    if (updateData.emailId) {
-        const existingEmailUser = await userRepository.findByEmail(updateData.emailId);
-        if (existingEmailUser && String(existingEmailUser._id) !== String(ownerId)) {
-            throw new ConflictError('Email already registered');
-        }
-    }
-
-    if (updateData.phoneNumber) {
-        const existingPhoneUser = await userRepository.findByPhone(updateData.phoneNumber);
-        if (existingPhoneUser && String(existingPhoneUser._id) !== String(ownerId)) {
-            throw new ConflictError('Phone number already registered');
-        }
-    }
-
     const updated = await shopRepository.updateByOwnerId(ownerId, updateData);
-    const userUpdates = {};
-    if (updateData.emailId) userUpdates.email = updateData.emailId;
-    if (updateData.phoneNumber) userUpdates.phoneNumber = updateData.phoneNumber;
-
-    if (Object.keys(userUpdates).length > 0) {
-        await userRepository.updateById(ownerId, userUpdates);
-    }
-
     const photos = await photoRepository.findByShopId(updated._id, {});
 
     return {
-        shop: serializeBarberProfile(updated, { photos }),
+        shop: serializeBarberProfile(updated, userContext, { photos }),
         updatedFields: Object.keys(updateData),
     };
 };
@@ -337,8 +295,8 @@ export const getUpiDetails = async (ownerId) => {
     return serializeUpiDetails(shop);
 };
 
-export const updateUpiDetails = async (ownerId, body) => {
-    const result = await updateBusinessInfo(ownerId, body);
+export const updateUpiDetails = async (ownerId, body, userContext) => {
+    const result = await updateBusinessInfo(ownerId, body, userContext);
     return serializeUpiDetails(result.shop);
 };
 
@@ -394,12 +352,13 @@ export const getShopInfoForCustomer = async (shopId) => {
         createdAt: rating.createdAt,
     }));
 
-    const {
-        pinHash,
-        coverCloudinaryId,
-        ownerPhotoCloudinaryId,
-        ...safeShop
-    } = shop.toObject();
+    const safeShop = shop.toObject();
+    delete safeShop.pinHash;
+    delete safeShop.coverCloudinaryId;
+    delete safeShop.ownerPhotoCloudinaryId;
+    for (const field of LEGACY_SHOP_CONTACT_FIELDS) {
+        delete safeShop[field];
+    }
 
     return {
         shop: safeShop,

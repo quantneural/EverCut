@@ -47,8 +47,7 @@
    - [7.5 Update User Repository](#75-update-user-repository)
    - [7.6 Update Upload Middleware](#76-update-upload-middleware)
    - [7.7 Clean Up Model Comments](#77-clean-up-model-comments)
-   - [7.7a Shop Model `emailId` — Analysis & Decision](#77a-shop-model-emailid--analysis--decision)
-   - [7.7b Update Authorize Middleware](#77b-update-authorize-middleware)
+   - [7.7a Update Authorize Middleware](#77a-update-authorize-middleware)
    - [7.8 Clean Up Scripts](#78-clean-up-scripts)
    - [7.9 Clean Up Environment & Config](#79-clean-up-environment--config)
    - [7.10 Remove Firebase Dependency](#710-remove-firebase-dependency)
@@ -1323,7 +1322,6 @@ Remove `phoneNumber` from onboarding schemas — it's already verified and store
   export const barberOnboardingSchema = Joi.object({
 -     phoneNumber: Joi.string(),
       email: Joi.string().email(),
--     emailId: Joi.string().email(),
       // ... rest unchanged ...
   });
 ```
@@ -1363,62 +1361,7 @@ Remove historical `firebaseUid` comments from these files:
 | `models/employee.model.js` | *"shopId replaces old firebaseUid"* |
 | `utils/logger.js` | Rename *"Firebase private keys"* → *"private keys"* |
 
-### 7.7a Remove Redundant `emailId` and `phoneNumber` from Shop Model
-
-**Analysis of the Architectural Flaw:**
-Currently, both the `User` model and `Shop` model store an `email` and `phoneNumber`. Due to poor separation of concerns, the shop profile updating endpoint `updateBusinessInfo()` previously synchronized changes down to the User account. This meant a barber could change their verified `user.phoneNumber` login simply by changing their public shop phone number — bypassing all secure OTP processes!
-
-**The Best Practice Solution:**
-The `emailId` and `phoneNumber` inside the `Shop` schema are redundant. The canonical contact credentials must live **only** in the `User` model (the owner). The Shop model should simply reference its parent `User` via `ownerId`. This removes synchronization vulnerabilities entirely.
-
-Apply the following refactors carefully across the codebase:
-
-**1. File:** `src/models/shop.model.js`
-Delete the fields from the schema:
-```diff
-- phoneNumber: { type: String, required: true, trim: true },
-- emailId: { type: String, required: true, lowercase: true, trim: true },
-```
-
-**2. File:** `src/services/shop.service.js` (`updateBusinessInfo`)
-Remove the malicious `userUpdates` synchronization logic and explicitly drop the removed fields from `ALLOWED_UPDATE_FIELDS`:
-```diff
-- const userUpdates = {};
-- if (updateData.emailId) userUpdates.email = updateData.emailId;
-- if (updateData.phoneNumber) userUpdates.phoneNumber = updateData.phoneNumber;
-- if (Object.keys(userUpdates).length > 0) {
--     await userRepository.updateById(ownerId, userUpdates);
-- }
-
-// In ALLOWED_UPDATE_FIELDS list, remove both 'phoneNumber' and 'emailId'
-```
-
-**3. File:** `src/validators/shop.validator.js`
-Remove `emailId` and `phoneNumber` from `updateBusinessInfoSchema`.
-
-**4. File:** `src/validators/onboarding.validator.js`
-Remove `emailId` from `barberOnboardingSchema`.
-
-**5. File:** `src/utils/barber-profile.utils.js`
-When serializing the barber profile, join the data from the `User` object rather than pulling from the `Shop` object:
-```diff
-  export const serializeBarberProfile = (shop, userContext, params = {}) => {
-      // ...
-      const safeShop = {
-          ...shop.toObject(),
--         emailId: undefined,
--         phoneNumber: undefined,
-+         email: userContext.email,
-+         phoneNumber: userContext.phoneNumber,
-      };
-      // ...
-  };
-```
-*(Make sure to pass `authUser` as `userContext` when calling `serializeBarberProfile` in the controllers).*
-
-By centralizing the identity scope exclusively to the `User`, the application becomes robust against state desynchronization and bypasses.
-
-### 7.7b Update Authorize Middleware
+### 7.7a Update Authorize Middleware
 
 **File:** `src/middleware/authorize.middleware.js`
 
@@ -1640,7 +1583,7 @@ server/
     │   ├── account.service.js               ← REFACTOR: remove firebase-admin, use JWT revocation
     │   ├── onboarding.service.js            ← REFACTOR: receives phoneNumber, CREATES fully verified user
     │   │                                       (instead of updating); ensureUniqueUserIdentity uses email/phone combo
-    │   ├── shop.service.js                  ← UPDATE: decouple shop.emailId from user.email sync
+    │   ├── shop.service.js                  ← UPDATE: align business profile updates with final ownership boundaries
     │   ├── otp.service.js                   ← NEW
     │   └── sms-provider.service.js          ← NEW
     ├── utils/
@@ -1648,7 +1591,8 @@ server/
     │   └── logger.js                        ← UPDATE: rename "Firebase private keys" comment
     └── validators/
         ├── auth.validator.js                ← REWRITE: OTP + token schemas
-        └── onboarding.validator.js          ← UPDATE: remove phoneNumber from schemas
+        └── onboarding.validator.js          ← UPDATE: align onboarding payload validation
+                                                with the final request contracts
 ```
 
 ---
@@ -1681,10 +1625,10 @@ server/
 - [ ] `account.service.js` refactored to use JWT revocation
 - [ ] `onboarding.controller.js` refactored — relies on `req.onboardingContext.phoneNumber`
 - [ ] `onboarding.service.js` refactored — explicitly CREATES user upon completion of the profile
-- [ ] `onboarding.validator.js` — `phoneNumber` removed from customer + barber schemas
-- [ ] `shop.model.js` — `emailId` and `phoneNumber` fields deleted completely
-- [ ] `shop.service.js` — Removed insecure `userUpdates` sync logic and pruned `ALLOWED_UPDATE_FIELDS`
-- [ ] `shop.validator.js` and `onboarding.validator.js` — `emailId` & `phoneNumber` stripped out
+- [ ] `onboarding.validator.js` — onboarding payload validation aligned with the final contracts
+- [ ] `shop.model.js` — schema aligned with the final entity boundaries
+- [ ] `shop.service.js` — business profile update handling aligned with the final ownership boundaries
+- [ ] `shop.validator.js` and `onboarding.validator.js` — validators aligned with the supported request fields
 - [ ] `barber-profile.utils.js` — serialization functions updated to join identity from `User` instead of `Shop`
 - [ ] `barber-profile.controller.js` updated to pass `req.user._id` to `signOutEverywhere`
 - [ ] `upload.middleware.js` — `firebaseUid` fallback removed

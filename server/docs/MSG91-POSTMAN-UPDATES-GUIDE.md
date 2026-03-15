@@ -463,7 +463,6 @@ Also update:
 - Collection descriptions — remove Firebase references, use OTP/JWT descriptions from [§4](#4-update-collection-descriptions)
 - Pre-request scripts — replace `readScopedValue('customer_firebase_token')` / `readScopedValue('barber_firebase_token')` with access token equivalents
 - Environment variable definitions — replace Firebase token entries with OTP/JWT variables from [§1](#1-environment-file)
-- **Onboarding Request Bodies:** In `02-onboarding.json` requests, **remove** the `phoneNumber` field from the JSON bodies, as it is now securely extracted from the `req.onboardingContext` instead of the form body. For **Barber Onboarding**, you must also **remove** the `emailId` property from the JSON body (it uses `email` exclusively now).
 - **Onboarding Auth Token:** The `02-onboarding.json` collection needs to inject the `onboardingToken` into the Bearer token instead of the standard `accessToken`.
 - **Onboarding Response Capture:** Add a post-request script to `02-onboarding.json` requests to capture the newly returned `accessToken` and `refreshToken` and set them into the postman environment, overwriting any previous values and fully logging in the user after successful onboarding.
 

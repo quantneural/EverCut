@@ -111,8 +111,8 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     const ownerNameFromNameParts = `${firstName} ${lastName}`.trim();
     const ownerName = String(shopData.shopOwner || shopData.ownerName || ownerNameFromNameParts).trim();
 
-    const emailId = String(shopData.emailId || shopData.email || '').trim().toLowerCase();
-    const phoneNumber = String(shopData.phoneNumber || authUser?.phoneNumber || '').trim();
+    const email = String(shopData.email || authUser?.email || '').trim().toLowerCase();
+    const phoneNumber = String(authUser?.phoneNumber || '').trim();
     const category = shopData.shopCategory || shopData.businessCategory || shopData.category;
     const address = String(shopData.address || shopData.shopLocation || '').trim();
     const upiId = String(shopData.upiId || shopData.upiAddress || '').trim();
@@ -179,7 +179,7 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     if (!ownerName) {
         throw new BadRequestError('shopOwner/ownerName or firstName + lastName are required');
     }
-    if (!emailId) {
+    if (!email) {
         throw new BadRequestError('email is required');
     }
     if (!phoneNumber) {
@@ -214,7 +214,7 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
         category,
         targetCustomers,
         phoneNumber,
-        emailId,
+        email,
         accountHolderName,
         bankName,
         upiId,
@@ -301,7 +301,7 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
     const normalized = normalizeBarberOnboardingInput(authUser, shopData);
     await ensureUniqueUserIdentity({
         firebaseUid,
-        email: normalized.emailId,
+        email: normalized.email,
         phoneNumber: normalized.phoneNumber,
     });
 
@@ -322,7 +322,7 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
     const user = await userRepository.create({
         firebaseUid,
         phoneNumber: normalized.phoneNumber,
-        email: normalized.emailId,
+        email: normalized.email,
         roleType: ROLES.BARBER,
     });
 
@@ -336,8 +336,6 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
         ownerDateOfBirth: normalized.dateOfBirth,
         category: normalized.category,
         targetCustomers: normalized.targetCustomers,
-        phoneNumber: normalized.phoneNumber,
-        emailId: normalized.emailId,
         accountHolderName: normalized.accountHolderName,
         bankName: normalized.bankName,
         upiId: normalized.upiId,
@@ -373,7 +371,7 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
 
     return {
         user,
-        shop: serializeBarberProfile(createdShop, { photos }),
+        shop: serializeBarberProfile(createdShop, user, { photos }),
         photos,
     };
 };

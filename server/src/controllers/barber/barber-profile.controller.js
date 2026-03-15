@@ -8,7 +8,7 @@ import { BadRequestError, NotFoundError } from '../../utils/api-error.js';
 
 export const getProfile = async (req, res, next) => {
     try {
-        const shop = await shopService.getShopByOwner(req.user._id);
+        const shop = await shopService.getShopByOwner(req.user._id, req.user);
         return res.status(200).json(ApiResponse.success(shop, 'Barber profile fetched'));
     } catch (err) {
         next(err);

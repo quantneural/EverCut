@@ -63,17 +63,6 @@ const shopSchema = new mongoose.Schema(
             enum: ALL_SERVICE_FOR,
             required: true,
         },
-        phoneNumber: {
-            type: String,
-            required: true,
-            trim: true,
-        },
-        emailId: {
-            type: String,
-            required: true,
-            lowercase: true,
-            trim: true,
-        },
         upiId: {
             type: String,
             required: true,

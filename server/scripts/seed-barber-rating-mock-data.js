@@ -180,8 +180,6 @@ const upsertShop = async (ownerId) => {
         ownerDateOfBirth: new Date('1990-01-15'),
         category: 'Barber',
         targetCustomers: 'male',
-        phoneNumber: BARBER_FIXTURE.phoneNumber,
-        emailId: BARBER_FIXTURE.email,
         upiId: 'evercut.mock@upi',
         accountHolderName: 'Test Barber Owner',
         bankName: 'Mock Bank',

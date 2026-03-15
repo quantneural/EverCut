@@ -82,7 +82,7 @@ export const searchServices = async (query, gender) => {
 };
 
 export const searchShops = async (query) => {
-    return shopRepository.searchByName(query, 'shopName address location phoneNumber category coverUrl');
+    return shopRepository.searchByName(query, 'shopName address location category coverUrl');
 };
 
 export const getServicesByGender = async (gender) => {

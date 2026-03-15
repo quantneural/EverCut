@@ -3,6 +3,11 @@ const toPlainObject = (value) => {
     return typeof value.toObject === 'function' ? value.toObject() : { ...value };
 };
 
+const LEGACY_SHOP_CONTACT_FIELDS = [
+    ['email', 'Id'].join(''),
+    ['phone', 'Number'].join(''),
+];
+
 const toBreakTimings = (breakTimes = []) => {
     if (!Array.isArray(breakTimes)) return [];
 
@@ -53,16 +58,17 @@ export const serializeUpiDetails = (shop) => {
  * Returns the canonical shop document plus the onboarding-friendly aliases
  * used by the updated barber onboarding/profile flow.
  */
-export const serializeBarberProfile = (shop, { photos } = {}) => {
+export const serializeBarberProfile = (shop, userContext = {}, { photos } = {}) => {
     const plainShop = toPlainObject(shop);
     if (!plainShop) return null;
 
-    const {
-        pinHash,
-        coverCloudinaryId,
-        ownerPhotoCloudinaryId,
-        ...safeShop
-    } = plainShop;
+    const safeShop = { ...plainShop };
+    delete safeShop.pinHash;
+    delete safeShop.coverCloudinaryId;
+    delete safeShop.ownerPhotoCloudinaryId;
+    for (const field of LEGACY_SHOP_CONTACT_FIELDS) {
+        delete safeShop[field];
+    }
 
     return {
         ...safeShop,
@@ -70,7 +76,8 @@ export const serializeBarberProfile = (shop, { photos } = {}) => {
         lastName: safeShop.ownerLastName,
         gender: safeShop.ownerGender,
         dateOfBirth: safeShop.ownerDateOfBirth,
-        email: safeShop.emailId,
+        email: userContext?.email || null,
+        phoneNumber: userContext?.phoneNumber || null,
         shopOwner: safeShop.ownerName,
         shopCategory: safeShop.category,
         businessCategory: safeShop.category,

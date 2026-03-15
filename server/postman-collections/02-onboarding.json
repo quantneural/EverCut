@@ -166,11 +166,6 @@
               "type": "text"
             },
             {
-              "key": "phoneNumber",
-              "value": "+15550000002",
-              "type": "text"
-            },
-            {
               "key": "dateOfBirth",
               "value": "1991-01-12",
               "type": "text"

@@ -45,9 +45,7 @@ export const customerOnboardingSchema = Joi.object({
 });
 
 export const barberOnboardingSchema = Joi.object({
-    phoneNumber: Joi.string(),
     email: Joi.string().email(),
-    emailId: Joi.string().email(),
     firstName: Joi.string().trim().min(1).max(50),
     lastName: Joi.string().trim().min(1).max(50),
     ownerFirstName: Joi.string().trim().min(1).max(50),
@@ -104,7 +102,6 @@ export const barberOnboardingSchema = Joi.object({
         value.dateOfBirth = value.dateOfBirth || value.ownerDateOfBirth;
         value.shopOwner = value.shopOwner || value.ownerName;
         value.shopCategory = value.shopCategory || value.businessCategory || value.category;
-        value.emailId = value.emailId || value.email;
         value.upiId = value.upiId || value.upiAddress;
         value.address = value.address || value.shopLocation;
         value.facilities = value.facilities ?? value.amenities ?? [];
@@ -149,9 +146,9 @@ export const barberOnboardingSchema = Joi.object({
                 message: 'gender and dateOfBirth are required',
             });
         }
-        if (!value.emailId) {
+        if (!value.email) {
             return helpers.error('any.custom', {
-                message: 'email or emailId is required',
+                message: 'email is required',
             });
         }
         if (!value.upiId) {
