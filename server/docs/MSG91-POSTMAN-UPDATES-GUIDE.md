@@ -36,8 +36,10 @@ Replace Firebase token variables with OTP/JWT variables:
     { "key": "test_otp", "value": "123456", "enabled": true },
     { "key": "customer_access_token", "value": "", "enabled": true },
     { "key": "customer_refresh_token", "value": "", "enabled": true },
+    { "key": "customer_onboarding_token", "value": "", "enabled": true },
     { "key": "barber_access_token", "value": "", "enabled": true },
-    { "key": "barber_refresh_token", "value": "", "enabled": true }
+    { "key": "barber_refresh_token", "value": "", "enabled": true },
+    { "key": "barber_onboarding_token", "value": "", "enabled": true }
   ],
   "_postman_variable_scope": "environment"
 }
@@ -52,6 +54,8 @@ Replace Firebase token variables with OTP/JWT variables:
 | `customer_refresh_token` | Auto-set by auth collection | *(set by test script)* |
 | `barber_access_token` | Auto-set by auth collection | *(set by test script)* |
 | `barber_refresh_token` | Auto-set by auth collection | *(set by test script)* |
+| `customer_onboarding_token` | Auto-set by auth collection | *(set by test script)* |
+| `barber_onboarding_token` | Auto-set by auth collection | *(set by test script)* |
 
 ---
 
@@ -82,8 +86,10 @@ The authentication collection uses the full OTP flow with 9 requests:
   { "key": "test_otp", "value": "123456", "type": "string" },
   { "key": "customer_access_token", "value": "", "type": "string" },
   { "key": "customer_refresh_token", "value": "", "type": "string" },
+  { "key": "customer_onboarding_token", "value": "", "type": "string" },
   { "key": "barber_access_token", "value": "", "type": "string" },
-  { "key": "barber_refresh_token", "value": "", "type": "string" }
+  { "key": "barber_refresh_token", "value": "", "type": "string" },
+  { "key": "barber_onboarding_token", "value": "", "type": "string" }
 ]
 ```
 
@@ -165,13 +171,18 @@ if (testOtp) { pm.collectionVariables.set('test_otp', testOtp); }
         "const data = response.data || {};",
         "",
         "// Capture tokens for use by all other collections",
-        "if (data.accessToken) {",
-        "  pm.collectionVariables.set('customer_access_token', data.accessToken);",
-        "  pm.environment.set('customer_access_token', data.accessToken);",
-        "}",
-        "if (data.refreshToken) {",
-        "  pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
-        "  pm.environment.set('customer_refresh_token', data.refreshToken);",
+        "if (data.isNewUser && data.onboardingToken) {",
+        "  pm.collectionVariables.set('customer_onboarding_token', data.onboardingToken);",
+        "  pm.environment.set('customer_onboarding_token', data.onboardingToken);",
+        "} else {",
+        "  if (data.accessToken) {",
+        "    pm.collectionVariables.set('customer_access_token', data.accessToken);",
+        "    pm.environment.set('customer_access_token', data.accessToken);",
+        "  }",
+        "  if (data.refreshToken) {",
+        "    pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
+        "    pm.environment.set('customer_refresh_token', data.refreshToken);",
+        "  }",
         "}",
         "",
         "pm.collectionVariables.set('last_session_role', 'CUSTOMER');",
@@ -258,29 +269,37 @@ Every collection needs **three changes**:
 
 ### 3.1 Collection-Level `auth` — Use JWT Access Tokens
 
-**Customer collections** (02-onboarding customer request, 03, 04, 05, 06):
-
+**Customer Onboarding collection** (`02-onboarding.json` Customer request):
 ```json
 "auth": {
   "type": "bearer",
-  "bearer": [{
-    "key": "token",
-    "value": "{{customer_access_token}}",
-    "type": "string"
-  }]
+  "bearer": [{ "key": "token", "value": "{{customer_onboarding_token}}", "type": "string" }]
 }
 ```
 
-**Barber collections** (02-onboarding barber request, 07, 08, 09, 10, 11, 12, 13):
+**Barber Onboarding collection** (`02-onboarding.json` Barber request):
+```json
+"auth": {
+  "type": "bearer",
+  "bearer": [{ "key": "token", "value": "{{barber_onboarding_token}}", "type": "string" }]
+}
+```
+
+**Customer collections** (03, 04, 05, 06):
 
 ```json
 "auth": {
   "type": "bearer",
-  "bearer": [{
-    "key": "token",
-    "value": "{{barber_access_token}}",
-    "type": "string"
-  }]
+  "bearer": [{ "key": "token", "value": "{{customer_access_token}}", "type": "string" }]
+}
+```
+
+**Barber collections** (07, 08, 09, 10, 11, 12, 13):
+
+```json
+"auth": {
+  "type": "bearer",
+  "bearer": [{ "key": "token", "value": "{{barber_access_token}}", "type": "string" }]
 }
 ```
 
@@ -305,7 +324,7 @@ if (barberToken) { pm.collectionVariables.set('barber_access_token', barberToken
 
 | File | Token Variable |
 |---|---|
-| `02-onboarding.json` | Both `customer_access_token` + `barber_access_token` |
+| `02-onboarding.json` | Both `customer_onboarding_token` + `barber_onboarding_token` |
 | `03-customer-profile.json` | `customer_access_token` |
 | `04-customer-bookings.json` | `customer_access_token` |
 | `05-customer-shop-discovery.json` | `customer_access_token` |
@@ -325,7 +344,7 @@ if (barberToken) { pm.collectionVariables.set('barber_access_token', barberToken
 | Collection | New Description |
 |---|---|
 | `01-authentication.json` | `"OTP authentication endpoints for customer and barber test users. Sends OTP, verifies it, and captures JWT access/refresh tokens for use by all other collections. Requires MSG91_TEST_MODE=true for local development."` |
-| `02-onboarding.json` | `"Customer and barber onboarding requests wired for the OTP test users and the local sample upload asset. Run 01-authentication.json first to populate access tokens."` |
+| `02-onboarding.json` | `"Customer and barber onboarding requests wired for the OTP test users and the local sample upload asset. Run 01-authentication.json first to populate onboarding tokens. Upon successful onboarding, access and refresh tokens are captured for the other collections."` |
 | `07-barber-profile-shop.json` | `"Barber profile and shop management collection. Uses JWT access token auto-populated by 01-authentication.json."` |
 
 Request **9A** in `07-barber-profile-shop.json`:
@@ -394,6 +413,8 @@ No manual token generation needed — the authentication collection handles ever
 | `customer_refresh_token` | *(auto-set by 01-authentication.json)* |
 | `barber_access_token` | *(auto-set by 01-authentication.json)* |
 | `barber_refresh_token` | *(auto-set by 01-authentication.json)* |
+| `customer_onboarding_token` | *(auto-set by 01-authentication.json)* |
+| `barber_onboarding_token` | *(auto-set by 01-authentication.json)* |
 
 ### 5.5 Auth Collection Requests
 
@@ -442,7 +463,9 @@ Also update:
 - Collection descriptions — remove Firebase references, use OTP/JWT descriptions from [§4](#4-update-collection-descriptions)
 - Pre-request scripts — replace `readScopedValue('customer_firebase_token')` / `readScopedValue('barber_firebase_token')` with access token equivalents
 - Environment variable definitions — replace Firebase token entries with OTP/JWT variables from [§1](#1-environment-file)
-- **Onboarding Request Bodies:** In `02-onboarding.json` requests, **remove** the `phoneNumber` field from the JSON bodies, as it is now securely extracted from the `req.user` token context instead of the form body.
+- **Onboarding Request Bodies:** In `02-onboarding.json` requests, **remove** the `phoneNumber` field from the JSON bodies, as it is now securely extracted from the `req.onboardingContext` instead of the form body. For **Barber Onboarding**, you must also **remove** the `emailId` property from the JSON body (it uses `email` exclusively now).
+- **Onboarding Auth Token:** The `02-onboarding.json` collection needs to inject the `onboardingToken` into the Bearer token instead of the standard `accessToken`.
+- **Onboarding Response Capture:** Add a post-request script to `02-onboarding.json` requests to capture the newly returned `accessToken` and `refreshToken` and set them into the postman environment, overwriting any previous values and fully logging in the user after successful onboarding.
 
 After updating, regenerate and verify:
 

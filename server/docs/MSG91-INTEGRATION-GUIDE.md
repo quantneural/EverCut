@@ -65,7 +65,7 @@
 
 ### 1.1 New Auth Flow (MSG91 OTP + Custom JWT)
 
-> **Key design decision:** The backend is the sole token issuer. Every successfully verified OTP results in a User record **and** a JWT pair — even for brand-new users. New users get `roleType: 'PENDING'`; the actual role (`CUSTOMER` / `BARBER`) is set during onboarding.
+> **Key design decision:** Secure token issuance. Database integrity is strictly maintained. We **never** create a User record in the database until they complete onboarding with all required fields (email, name, etc.). Instead, we issue a temporary, short-lived `onboardingToken` upon OTP verification for brand-new users.
 
 ```text
 ─── Returning User ───────────────────────────────────────────────────
@@ -84,17 +84,17 @@
 ─── New User ─────────────────────────────────────────────────────────
 1–6. Same as above
 7. OTP valid → no User found by phoneNumber
-8. Create User: { phoneNumber, roleType: 'PENDING' } → issue tokens
-9. Response: { isNewUser: true, user, accessToken, refreshToken }
+8. **DO NOT create a User record**. Issue an internal short-lived `onboardingToken` (valid for 30m) containing only the `phoneNumber`.
+9. Response: { isNewUser: true, onboardingToken }
 10. App navigates to onboarding screen
 11. App → POST /api/v1/onboarding/customers  (or /barbers)
-        with Bearer <accessToken>
-12. Backend reads req.user._id from JWT → updates PENDING user
-        to CUSTOMER/BARBER, creates profile data
-13. All subsequent requests use Bearer <accessToken>
+        with header `Authorization: Bearer <onboardingToken>`
+12. Backend validates onboarding token, extracts `phoneNumber`, creates the User and Profile records simultaneously.
+13. Response returns the standard { user, profile, accessToken, refreshToken }.
+14. All subsequent requests use Bearer <accessToken>
 ```
 
-> **Why PENDING?** Without issuing tokens for new users, they cannot reach the `authenticate`-protected onboarding endpoints. The PENDING role bridges OTP verification → profile completion. The `authorize` middleware blocks PENDING users from all routes except onboarding.
+> **Why an Onboarding Token?** Previously, the flow created `PENDING` users with optional emails, leading to a database full of abandoned, incomplete accounts ("zombie users") if they dropped off at the onboarding screen. By using a secure JWT `onboardingToken`, we pass the verified phone number state safely to the onboarding endpoint without muddying the database. Weakening constraints like making `email` optional is poor practice.
 
 ### 1.2 Layer Mapping
 
@@ -190,7 +190,6 @@ npm uninstall firebase-admin
 // ── Roles (update existing) ─────────────────────────────────────────
 // Add PENDING to the existing ROLES object:
 export const ROLES = Object.freeze({
-    PENDING: 'PENDING',     // ← NEW — user created at OTP, not yet onboarded
     CUSTOMER: 'CUSTOMER',
     BARBER: 'BARBER',
     ADMIN: 'ADMIN',
@@ -212,12 +211,13 @@ export const OTP_RATE_LIMIT = Object.freeze({
 
 // ── Token Types ─────────────────────────────────────────────────────
 export const TOKEN_TYPE = Object.freeze({
+    ONBOARDING: 'onboarding', // ← NEW — given after OTP, required for profile creation
     ACCESS: 'access',
     REFRESH: 'refresh',
 });
 ```
 
-> **Note:** The existing `ROLES` constant in the codebase currently has `{ CUSTOMER, BARBER, ADMIN }` with a default of `CUSTOMER`. Add `PENDING` as the first entry and change the User model's `roleType` default to `ROLES.PENDING` (see [§6](#6-user-model-changes)).
+> **Note:** The existing `ROLES` constant in the codebase currently has `{ CUSTOMER, BARBER, ADMIN }` with a default of `CUSTOMER`. No changes to `ROLES` are needed anymore since we are adopting the `onboardingToken` flow.
 
 ---
 
@@ -474,6 +474,27 @@ import logger from '../utils/logger.js';
 // ── Token generation ──────────────────────────────────────────────────
 
 /** Generate a pair of access + refresh tokens. */
+export const generateOnboardingToken = (phoneNumber) => {
+    return jwt.sign(
+        { sub: phoneNumber, type: TOKEN_TYPE.ONBOARDING },
+        config.jwt.accessSecret,
+        { expiresIn: '30m' }
+    );
+};
+
+export const verifyOnboardingToken = (token) => {
+    try {
+        const decoded = jwt.verify(token, config.jwt.accessSecret);
+        if (decoded.type !== TOKEN_TYPE.ONBOARDING) {
+            throw new UnauthorizedError('Invalid token type for onboarding');
+        }
+        return decoded;
+    } catch {
+        throw new UnauthorizedError('Invalid or expired onboarding token');
+    }
+};
+
+/** Generate a pair of access + refresh tokens. */
 export const generateTokenPair = (userId, roleType) => {
     const accessToken = jwt.sign(
         { sub: userId.toString(), role: roleType, type: TOKEN_TYPE.ACCESS },
@@ -528,12 +549,10 @@ export const hashToken = (token) => {
  * Resolve user session after OTP verification.
  *
  * - **Existing user:** update lastLoginAt, issue tokens, load profile.
- * - **New user:** create a PENDING User record with the verified phone number,
- *   issue tokens. The client proceeds to onboarding (which updates the
- *   PENDING record to CUSTOMER/BARBER and creates profile data).
+ * - **New user:** issues an `onboardingToken` (valid 30 mins, contains only the phone number).
+ *   The client proceeds to onboarding and passes this token to authenticate.
  *
- * Tokens are ALWAYS issued — even for new users — so the client can call
- * the `authenticate`-protected onboarding endpoints.
+ * We DO NOT create a database record for incomplete user profiles.
  *
  * @param {string} phoneNumber — verified phone number (10-digit)
  * @returns {{ isNewUser: boolean, user: object, profile?: object, tokens: object }}
@@ -563,28 +582,17 @@ export const resolveOtpSession = async (phoneNumber) => {
                 profile = serializeBarberProfile(shop, { photos });
             }
         }
-        // Note: PENDING users (who abandoned onboarding) will return with
-        // isNewUser: true so the client re-shows the onboarding screen.
-        const isNewUser = existingUser.roleType === ROLES.PENDING;
-        return { isNewUser, user: existingUser, profile, tokens };
+        return { isNewUser: false, user: existingUser, profile, tokens };
     }
 
-    // ── New user — create PENDING record ──────────────────────────────
-    const newUser = await userRepository.create({
-        phoneNumber: formattedPhone,
-        roleType: ROLES.PENDING,
-    });
+    // ── New user — issue onboarding token ──────────────────────────────
+    const onboardingToken = generateOnboardingToken(formattedPhone);
 
-    const tokens = generateTokenPair(newUser._id, ROLES.PENDING);
-    const refreshHash = hashToken(tokens.refreshToken);
-    await userRepository.updateById(newUser._id, { refreshTokenHash: refreshHash });
-
-    logger.info('New PENDING user created after OTP verification', {
-        userId: newUser._id,
+    logger.info('OTP verified for new user — issued onboarding token', {
         phone: formattedPhone.slice(-4).padStart(formattedPhone.length, '*'),
     });
 
-    return { isNewUser: true, user: newUser, tokens };
+    return { isNewUser: true, onboardingToken };
 };
 
 /** Refresh an access token using a valid refresh token. */
@@ -752,15 +760,22 @@ export const verifyOtp = async (req, res, next) => {
         await otpService.verifyOtp(mobile, otp, req.ip);
         const session = await authService.resolveOtpSession(mobile);
 
-        // Tokens are ALWAYS returned — even for new users — so the
-        // client can call `authenticate`-protected onboarding endpoints.
-        const responseData = {
-            isNewUser: session.isNewUser,
-            user: session.user,
-            profile: session.profile || null,
-            accessToken: session.tokens.accessToken,
-            refreshToken: session.tokens.refreshToken,
-        };
+        let responseData;
+        if (session.isNewUser) {
+            responseData = {
+                isNewUser: true,
+                onboardingToken: session.onboardingToken,
+            };
+        } else {
+            responseData = {
+                isNewUser: false,
+                user: session.user,
+                profile: session.profile,
+                accessToken: session.tokens.accessToken,
+                refreshToken: session.tokens.refreshToken,
+            };
+        }
+
 
         const message = session.isNewUser
             ? 'OTP verified. Please complete your profile.'
@@ -864,8 +879,7 @@ import logger from '../utils/logger.js';
 /**
  * Authenticate middleware — verifies JWT access token.
  *
- * Every user (including PENDING new users) has a valid JWT after OTP
- * verification — there is no "new user without token" branch.
+ * The onboarding Token is explicitly rejected by this middleware.
  *
  * On success, attaches to `req.user`:
  *   - _id            (MongoDB ObjectId)
@@ -885,6 +899,11 @@ const authenticate = async (req, _res, next) => {
         if (!token) throw new UnauthorizedError('No token provided');
 
         const decoded = authService.verifyAccessToken(token);
+
+        if (decoded.type === TOKEN_TYPE.ONBOARDING) {
+             throw new UnauthorizedError('Onboarding token cannot be used for standard API access');
+        }
+
         const user = await userRepository.findById(decoded.sub);
 
         if (!user || user.deletedAt || user.isActive === false) {
@@ -908,6 +927,41 @@ const authenticate = async (req, _res, next) => {
 };
 
 export default authenticate;
+```
+
+**File:** `src/middleware/authenticate-onboarding.middleware.js` — **NEW**
+
+```javascript
+import * as authService from '../services/auth.service.js';
+import { UnauthorizedError } from '../utils/api-error.js';
+import logger from '../utils/logger.js';
+
+/**
+ * Middleware for onboarding endpoints.
+ * Validates the temporary onboarding token and extracts the verified phone number.
+ */
+export const authenticateOnboarding = async (req, _res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader?.startsWith('Bearer ')) {
+            throw new UnauthorizedError('No onboarding token provided');
+        }
+
+        const token = authHeader.split(' ')[1];
+        if (!token) throw new UnauthorizedError('No onboarding token provided');
+
+        const decoded = authService.verifyOnboardingToken(token);
+        
+        req.onboardingContext = {
+            phoneNumber: decoded.sub,
+        };
+
+        next();
+    } catch (err) {
+        logger.warn('Onboarding token verification failed', { error: err.message });
+        next(new UnauthorizedError('Invalid or expired onboarding token. Please verify OTP again.'));
+    }
+};
 ```
 
 ---
@@ -956,26 +1010,11 @@ refreshTokenHash: {
 },
 ```
 
-### 6.3 Make `email` Optional + Add `emailVerified`
+### 6.3 Maintain `email` as Required + Add `emailVerified`
 
-> **Why optional?** In the new OTP flow, users are created as `PENDING` at OTP verification time — before onboarding, when email is not yet known. The `email` field is populated later during onboarding (from `profileData.email` for customers, `shopData.emailId` for barbers).
+> **Why required?** The User model is strictly created ONLY during the final stage of onboarding. By the time a user is inserted into the DB, the `email` field is collected from the onboarding form. Loosening schema constraints would allow corrupt incomplete user traces, which we explicitly avoid with the `onboardingToken` pattern. Therefore, `email` remains `required: true` and `unique: true`.
 
-**Replace** the existing `email` field:
-
-```diff
-  email: {
-      type: String,
--     required: true,
--     unique: true,
-+     required: false,
-+     default: null,
-      lowercase: true,
-      trim: true,
-+     // Sparse index — unique constraint only applies when email is not null.
-+     // This avoids duplicate-key errors for PENDING users who don't have
-+     // an email yet. Defined below in the index section.
-  },
-```
+**Keep** the existing `email` field as it is in the database.
 
 **Add** the `emailVerified` field (after `email`):
 
@@ -992,30 +1031,22 @@ emailVerified: {
 > 3. User clicks link / enters OTP → backend sets `emailVerified: true`
 > 4. Certain features (e.g., email-based notifications, password reset) can require `emailVerified: true`
 
-### 6.4 Change `roleType` Default to `PENDING`
+### 6.4 Remove `firebaseUid` logic, Keep `roleType` exact
 
-```diff
+```javascript
   roleType: {
       type: String,
       required: true,
       enum: ALL_ROLES,
--     default: ROLES.CUSTOMER,
-+     default: ROLES.PENDING,
+      default: ROLES.CUSTOMER,
   },
 ```
 
-> **Why PENDING?** Users are created at OTP verification before they choose a role. The `PENDING` state bridges the gap between "phone verified" and "onboarding complete". The role is updated to `CUSTOMER` or `BARBER` during onboarding.
+> **No PENDING role:** With the adoption of the `onboardingToken`, users are explicitly created directly as `CUSTOMER` or `BARBER` during the onboarding process. The enum `{ CUSTOMER, BARBER, ADMIN }` remains untouched.
 
 ### 6.5 Updated Indexes
 
-Remove the old `firebaseUid` unique index. Ensure `phoneNumber` has a unique index (it already does). Add a **sparse unique** index on `email`:
-
-```javascript
-// Replace old email unique index with sparse unique
-userSchema.index({ email: 1 }, { unique: true, sparse: true });
-```
-
-> **Sparse index:** Allows multiple documents with `email: null` (PENDING users) while still enforcing uniqueness for non-null values.
+Remove the old `firebaseUid` unique index. Both `email` and `phoneNumber` retain their standard unique indices since we guarantee data presence at creation block.
 
 ### 6.6 Full Updated Schema Reference
 
@@ -1030,8 +1061,8 @@ const userSchema = new mongoose.Schema(
         },
         email: {
             type: String,
-            required: false,
-            default: null,
+            required: true,
+            unique: true,
             lowercase: true,
             trim: true,
         },
@@ -1043,7 +1074,7 @@ const userSchema = new mongoose.Schema(
             type: String,
             required: true,
             enum: ALL_ROLES,
-            default: ROLES.PENDING,
+            default: ROLES.CUSTOMER,
         },
         refreshTokenHash: {
             type: String,
@@ -1067,7 +1098,7 @@ const userSchema = new mongoose.Schema(
 );
 
 // Indexes
-userSchema.index({ email: 1 }, { unique: true, sparse: true });
+userSchema.index({ email: 1 }, { unique: true });
 userSchema.index({ roleType: 1, isActive: 1 });
 ```
 
@@ -1094,11 +1125,10 @@ async findByIdWithRefreshHash(id) {
 Update `authService.refreshAccessToken()` to use `findByIdWithRefreshHash()` instead of `findById()`.
 
 > **Important — `email` in the OTP flow summary:**
-> - `resolveOtpSession()` creates a PENDING user with `phoneNumber` only — no email
-> - The client must prompt for email during the onboarding step
-> - Onboarding service **updates** the PENDING user's email and role
-> - `ensureUniqueUserIdentity()` validates email uniqueness at onboarding time
-> - `req.user.email` is available on all authenticated requests after onboarding (from the DB lookup in the authenticate middleware); it will be `null` for PENDING users
+> - `resolveOtpSession()` securely passes the `phoneNumber` via `onboardingToken`.
+> - The client strictly provides the email upon onboarding.
+> - Onboarding service explicitly **creates** the user document populating all required fields.
+> - `req.user.email` is available on all requests after standard successful JWT authentication.
 
 ---
 
@@ -1154,23 +1184,24 @@ rm firebase-admin-sdk.json
 
 **File:** `src/controllers/onboarding.controller.js`
 
-> **Key change:** Pass the full `req.user` object (which includes `_id`, `phoneNumber`, `roleType: 'PENDING'`) instead of just `req.user.phoneNumber`. The onboarding service will use `req.user._id` to **update** the existing PENDING user rather than creating a new one.
+> **Key change:** Replace `firebaseUid` logic with the validated `phoneNumber` obtained from the `req.onboardingContext`. The `authenticateOnboarding` middleware verifies the onboarding token and decodes the phone number. Furthermore, the newly created `accessToken` and `refreshToken` generated by the Auth Service are attached to the response.
 
 ```diff
   export const createCustomerOnboarding = async (req, res, next) => {
       try {
 -         const { firebaseUid } = req.user;
 -         const result = await onboardingService.createCustomerOnboarding(firebaseUid, req.body, req.file);
-+         const result = await onboardingService.createCustomerOnboarding(req.user, req.body, req.file);
-+         // Note: req.user._id and req.user.phoneNumber come from the JWT;
-+         // req.body contains onboarding form data (email, name, etc.)
++         const { phoneNumber } = req.onboardingContext;
++         const result = await onboardingService.createCustomerOnboarding(phoneNumber, req.body, req.file);
++         return res.status(201).json(ApiResponse.success(result, 'Customer profile created'));
 
   export const createBarberOnboarding = async (req, res, next) => {
       try {
 -         const { firebaseUid } = req.user;
 -         const result = await onboardingService.createBarberOnboarding(firebaseUid, req.user, req.body, req.files);
-+         const result = await onboardingService.createBarberOnboarding(req.user, req.body, req.files);
-+         // Note: authUser data is already in req.user — no need for separate param
++         const { phoneNumber } = req.onboardingContext;
++         const result = await onboardingService.createBarberOnboarding(phoneNumber, req.body, req.files);
++         return res.status(201).json(ApiResponse.success(result, 'Barber profile created'));
 ```
 
 ### 7.4 Refactor Onboarding Service
@@ -1179,122 +1210,100 @@ rm firebase-admin-sdk.json
 
 #### 7.4.1 Update `ensureUniqueUserIdentity`
 
-Replace `firebaseUid` checks with `userId` (the `_id` of the PENDING user). Phone number uniqueness is already guaranteed since it was set when the PENDING user was created at OTP time.
+A user shouldn't exist because we only trigger this endpoint if the user didn't exist at the time of OTP verification. However, to be perfectly robust against race conditions, we assert uniqueness across `phoneNumber` AND `email`.
 
 ```diff
 - const ensureUniqueUserIdentity = async ({ firebaseUid, email, phoneNumber }) => {
-+ const ensureUniqueUserIdentity = async ({ userId, email }) => {
++ const ensureUniqueUserIdentity = async ({ email, phoneNumber }) => {
       const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
--     const normalizedPhoneNumber = phoneNumber ? String(phoneNumber).trim() : null;
+      const normalizedPhoneNumber = phoneNumber ? String(phoneNumber).trim() : null;
 
--     const [emailOwner, phoneOwner] = await Promise.all([
--         normalizedEmail ? userRepository.findByEmail(normalizedEmail) : null,
--         normalizedPhoneNumber ? userRepository.findByPhone(normalizedPhoneNumber) : null,
--     ]);
-+     const emailOwner = normalizedEmail
-+         ? await userRepository.findByEmail(normalizedEmail)
-+         : null;
+      const [emailOwner, phoneOwner] = await Promise.all([
+          normalizedEmail ? userRepository.findByEmail(normalizedEmail) : null,
+          normalizedPhoneNumber ? userRepository.findByPhone(normalizedPhoneNumber) : null,
+      ]);
 
 -     if (emailOwner && emailOwner.firebaseUid !== firebaseUid) {
-+     if (emailOwner && String(emailOwner._id) !== String(userId)) {
++     if (emailOwner) {
           throw new ConflictError('Email already registered');
       }
--
+
 -     if (phoneOwner && phoneOwner.firebaseUid !== firebaseUid) {
--         throw new ConflictError('Phone number already registered');
--     }
-+     // Phone number check is NOT needed here — the PENDING user already
-+     // owns the phone number from OTP verification, and phoneNumber has
-+     // a unique index in the DB. No one else can claim it.
++     if (phoneOwner) {
+          throw new ConflictError('Phone number already registered');
+      }
   };
 ```
 
 #### 7.4.2 Update `createCustomerOnboarding`
 
-The function now receives the full `authUser` object (from `req.user`) and **updates** the existing PENDING user instead of creating a new one. The phone number is already stored on the user — it comes from `authUser.phoneNumber`, not from `profileData.phoneNumber`.
+The function now receives the `phoneNumber` directly from the valid `onboardingToken`. Instead of searching by `firebaseUid`, we enforce unique checks and then freshly create the user. Finally we generate the authentication tokens using the `authService` layer.
 
-```diff
-- export const createCustomerOnboarding = async (firebaseUid, profileData, file) => {
--     const existing = await userRepository.findByFirebaseUid(firebaseUid);
--     if (existing) throw new ConflictError('User already exists');
-+ export const createCustomerOnboarding = async (authUser, profileData, file) => {
-+     // authUser = { _id, phoneNumber, roleType, ... } from req.user
-+     if (authUser.roleType !== ROLES.PENDING) {
-+         throw new ConflictError('User is already onboarded');
-+     }
+```javascript
+import * as authService from './auth.service.js';
 
-      if (!file) throw new BadRequestError('Profile photo is required');
+export const createCustomerOnboarding = async (phoneNumber, profileData, file) => {
+    if (!file) throw new BadRequestError('Profile photo is required');
 
-      await ensureUniqueUserIdentity({
--         firebaseUid,
-+         userId: authUser._id,
-          email: profileData.email,
--         phoneNumber: profileData.phoneNumber,
-      });
+    await ensureUniqueUserIdentity({
+        email: profileData.email,
+        phoneNumber: phoneNumber,
+    });
 
--     // ... location parsing stays the same ...
-+     // ... location parsing stays the same ...
+    // ... location parsing ...
 
--     const user = await userRepository.create({
--         firebaseUid,
--         phoneNumber: profileData.phoneNumber,
--         email: profileData.email,
--         roleType: ROLES.CUSTOMER,
--     });
-+     // UPDATE the existing PENDING user (not create a new one)
-+     const user = await userRepository.updateById(authUser._id, {
-+         email: profileData.email,
-+         roleType: ROLES.CUSTOMER,
-+     });
+    const user = await userRepository.create({
+        phoneNumber: phoneNumber,
+        email: profileData.email,
+        roleType: ROLES.CUSTOMER,
+    });
 
-      const profile = await customerProfileRepo.create({
-          userId: user._id,
-          // ... rest stays the same ...
-      });
+    const profile = await customerProfileRepo.create({
+        userId: user._id,
+        // ... mapped profileData fields ...
+    });
 
-      return { user, profile };
-  };
+    const tokens = authService.generateTokenPair(user._id, user.roleType);
+    const refreshHash = authService.hashToken(tokens.refreshToken);
+    await userRepository.updateById(user._id, { refreshTokenHash: refreshHash });
+
+    return { user, profile, tokens };
+};
 ```
 
 #### 7.4.3 Update `createBarberOnboarding`
 
-Same pattern as customer — receives `authUser` object, updates PENDING user:
+Identical logic wrapper mapping the `phoneNumber` verification and returning full session tokens.
 
-```diff
-- export const createBarberOnboarding = async (firebaseUid, authUser, shopData, files) => {
--     const existing = await userRepository.findByFirebaseUid(firebaseUid);
--     if (existing) throw new ConflictError('Barber already exists');
-+ export const createBarberOnboarding = async (authUser, shopData, files) => {
-+     if (authUser.roleType !== ROLES.PENDING) {
-+         throw new ConflictError('User is already onboarded');
-+     }
+```javascript
+export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
+    // We pass phoneNumber explicitly, so we override the normalizeBarberOnboardingInput requirement of authUser.
+    const normalized = normalizeBarberOnboardingInput({ phoneNumber }, shopData);
+    
+    await ensureUniqueUserIdentity({
+        email: normalized.email,
+        phoneNumber: normalized.phoneNumber,
+    });
 
-      const normalized = normalizeBarberOnboardingInput(authUser, shopData);
-      await ensureUniqueUserIdentity({
--         firebaseUid,
-+         userId: authUser._id,
-          email: normalized.emailId,
--         phoneNumber: normalized.phoneNumber,
-      });
+    // ... Validation and Image Handlers ...
 
-      // ... pin validation, image extraction stays the same ...
+    const user = await userRepository.create({
+        phoneNumber: normalized.phoneNumber,
+        email: normalized.email,
+        roleType: ROLES.BARBER,
+    });
 
--     const user = await userRepository.create({
--         firebaseUid,
--         phoneNumber: normalized.phoneNumber,
--         email: normalized.emailId,
--         roleType: ROLES.BARBER,
--     });
-+     // UPDATE the existing PENDING user (not create a new one)
-+     const user = await userRepository.updateById(authUser._id, {
-+         email: normalized.emailId,
-+         roleType: ROLES.BARBER,
-+     });
+    const createdShop = await shopRepository.create({
+         ownerId: user._id,
+         // ... rest stays the same ...
+    });
 
-      const createdShop = await shopRepository.create({
-          ownerId: user._id,
-          // ... rest stays the same ...
-      });
+    const tokens = authService.generateTokenPair(user._id, user.roleType);
+    const refreshHash = authService.hashToken(tokens.refreshToken);
+    await userRepository.updateById(user._id, { refreshTokenHash: refreshHash });
+
+    return { user, shop: serializeBarberProfile(createdShop, { photos }), photos, tokens };
+};
 ```
 
 #### 7.4.4 Update Onboarding Validators
@@ -1314,12 +1323,12 @@ Remove `phoneNumber` from onboarding schemas — it's already verified and store
   export const barberOnboardingSchema = Joi.object({
 -     phoneNumber: Joi.string(),
       email: Joi.string().email(),
-      emailId: Joi.string().email(),
+-     emailId: Joi.string().email(),
       // ... rest unchanged ...
   });
 ```
 
-> **Rationale:** The phone number is already verified during OTP and stored in the User model. Accepting it again from the form body is redundant and introduces a trust gap (the client could submit a different number). The service uses `authUser.phoneNumber` exclusively.
+> **Rationale:** The phone number is already verified during OTP and securely passed as part of the `onboardingToken`. Accepting it again from the form body is redundant and introduces a trust gap (the client could submit a different number). The service accesses the verified number from `req.onboardingContext.phoneNumber` exclusively.
 
 ### 7.5 Update User Repository
 
@@ -1354,64 +1363,68 @@ Remove historical `firebaseUid` comments from these files:
 | `models/employee.model.js` | *"shopId replaces old firebaseUid"* |
 | `utils/logger.js` | Rename *"Firebase private keys"* → *"private keys"* |
 
-### 7.7a Shop Model `emailId` — Analysis & Decision
+### 7.7a Remove Redundant `emailId` and `phoneNumber` from Shop Model
 
-**File:** `src/models/shop.model.js`
+**Analysis of the Architectural Flaw:**
+Currently, both the `User` model and `Shop` model store an `email` and `phoneNumber`. Due to poor separation of concerns, the shop profile updating endpoint `updateBusinessInfo()` previously synchronized changes down to the User account. This meant a barber could change their verified `user.phoneNumber` login simply by changing their public shop phone number — bypassing all secure OTP processes!
 
-The shop model has an `emailId` field that stores an email address for the shop/business:
+**The Best Practice Solution:**
+The `emailId` and `phoneNumber` inside the `Shop` schema are redundant. The canonical contact credentials must live **only** in the `User` model (the owner). The Shop model should simply reference its parent `User` via `ownerId`. This removes synchronization vulnerabilities entirely.
 
-```javascript
-emailId: {
-    type: String,
-    required: true,
-    lowercase: true,
-    trim: true,
-},
-```
+Apply the following refactors carefully across the codebase:
 
-**Current behavior (problematic):**
-- During barber onboarding, the **same email** is stored in both `user.email` and `shop.emailId`
-- In `shop.service.js` → `updateBusinessInfo()`, when `shop.emailId` is updated, it **auto-syncs** to `user.email`:
-  ```javascript
-  if (updateData.emailId) userUpdates.email = updateData.emailId;
-  ```
-
-**Analysis — should `emailId` be removed?**
-
-No. The `emailId` on Shop serves a **distinct purpose** from `user.email`:
-- `user.email` = **owner's personal/account email** (for future email verification, notifications, recovery)
-- `shop.emailId` = **shop/business contact email** (displayed publicly, used for business inquiries)
-
-These *can* be the same email, but conceptually they are different data points. A barber might want `owner@gmail.com` for their account but `mybarbershop@business.com` for the shop listing.
-
-**Decision: Keep `emailId` on Shop model, but decouple it from `user.email`:**
-
-1. **Stop auto-syncing** in `shop.service.js` → `updateBusinessInfo()`:
-
+**1. File:** `src/models/shop.model.js`
+Delete the fields from the schema:
 ```diff
-  const userUpdates = {};
-- if (updateData.emailId) userUpdates.email = updateData.emailId;
-  if (updateData.phoneNumber) userUpdates.phoneNumber = updateData.phoneNumber;
+- phoneNumber: { type: String, required: true, trim: true },
+- emailId: { type: String, required: true, lowercase: true, trim: true },
 ```
 
-2. During barber onboarding, set `user.email` and `shop.emailId` independently:
-   - `user.email = normalized.emailId` (initially the same — this is fine for MVP)
-   - `shop.emailId = normalized.emailId`
-   - In the future, the onboarding form can accept two separate email fields
+**2. File:** `src/services/shop.service.js` (`updateBusinessInfo`)
+Remove the malicious `userUpdates` synchronization logic and explicitly drop the removed fields from `ALLOWED_UPDATE_FIELDS`:
+```diff
+- const userUpdates = {};
+- if (updateData.emailId) userUpdates.email = updateData.emailId;
+- if (updateData.phoneNumber) userUpdates.phoneNumber = updateData.phoneNumber;
+- if (Object.keys(userUpdates).length > 0) {
+-     await userRepository.updateById(ownerId, userUpdates);
+- }
 
-3. The `user.email` can only be changed through a dedicated profile/account update endpoint (not through shop profile updates).
+// In ALLOWED_UPDATE_FIELDS list, remove both 'phoneNumber' and 'emailId'
+```
 
-> **Note:** Phone number sync (`shop.phoneNumber` → `user.phoneNumber`) is also worth reviewing. Currently, a barber can change their shop phone number via `updateBusinessInfo`, and it syncs to `user.phoneNumber`. This should also be decoupled in the future — `user.phoneNumber` is the verified identity key and should only change through a re-verification flow. However, this is out of scope for the MSG91 migration.
+**3. File:** `src/validators/shop.validator.js`
+Remove `emailId` and `phoneNumber` from `updateBusinessInfoSchema`.
+
+**4. File:** `src/validators/onboarding.validator.js`
+Remove `emailId` from `barberOnboardingSchema`.
+
+**5. File:** `src/utils/barber-profile.utils.js`
+When serializing the barber profile, join the data from the `User` object rather than pulling from the `Shop` object:
+```diff
+  export const serializeBarberProfile = (shop, userContext, params = {}) => {
+      // ...
+      const safeShop = {
+          ...shop.toObject(),
+-         emailId: undefined,
+-         phoneNumber: undefined,
++         email: userContext.email,
++         phoneNumber: userContext.phoneNumber,
+      };
+      // ...
+  };
+```
+*(Make sure to pass `authUser` as `userContext` when calling `serializeBarberProfile` in the controllers).*
+
+By centralizing the identity scope exclusively to the `User`, the application becomes robust against state desynchronization and bypasses.
 
 ### 7.7b Update Authorize Middleware
 
 **File:** `src/middleware/authorize.middleware.js`
 
-The authorize middleware currently checks `req.user.isNewUser` — a flag that was set by the old Firebase authenticate middleware for users not yet in the DB. With the new PENDING user flow, all users are in the DB with a `roleType`. Replace the `isNewUser` check with a `PENDING` role check:
+The authorize middleware currently checks `req.user.isNewUser` — a flag that was set by the old Firebase authenticate middleware for users not yet in the DB. Since we now use the `onboardingToken` for un-profiled users, any request reaching here with an access token is guaranteed to have a valid role in DB. Simply remove the obsolete `isNewUser` check:
 
 ```diff
-+ import { ROLES } from '../utils/constants.js';
-
   export const authorize = (...allowedRoles) => {
       return (req, _res, next) => {
           if (!req.user) {
@@ -1419,10 +1432,9 @@ The authorize middleware currently checks `req.user.isNewUser` — a flag that w
           }
 
 -         if (req.user.isNewUser) {
-+         if (req.user.roleType === ROLES.PENDING) {
-              // PENDING users can only access onboarding endpoints
-              return next(new ForbiddenError('Please complete your profile first'));
-          }
+-             // PENDING users can only access onboarding endpoints
+-             return next(new ForbiddenError('Please complete your profile first'));
+-         }
 
           if (!allowedRoles.includes(req.user.roleType)) {
               return next(
@@ -1437,7 +1449,7 @@ The authorize middleware currently checks `req.user.isNewUser` — a flag that w
   };
 ```
 
-> **Onboarding routes** use `authenticate` but do **not** use `authorize()` — PENDING users need access to these endpoints. All other route groups (customer, barber) use `authenticate` + `authorize(ROLES.CUSTOMER)` or `authorize(ROLES.BARBER)`, which automatically blocks PENDING users.
+> **Onboarding routes** use `authenticateOnboarding`. All other route groups (customer, barber) use standard token authentication + `authorize(ROLES.CUSTOMER)` or `authorize(ROLES.BARBER)`.
 
 ### 7.8 Clean Up Scripts
 
@@ -1609,13 +1621,11 @@ server/
     │       └── barber-profile.controller.js  ← UPDATE: signOutEverywhere(req.user._id)
     ├── middleware/
     │   ├── authenticate.middleware.js        ← REWRITE: JWT-only; includes emailVerified in req.user
-    │   ├── authorize.middleware.js           ← UPDATE: isNewUser → ROLES.PENDING check
+    │   ├── authorize.middleware.js           ← UPDATE: Remove obsolete isNewUser check
     │   ├── otp-rate-limiter.middleware.js    ← NEW
     │   └── upload.middleware.js              ← REMOVE: firebaseUid fallback
     ├── models/
     │   ├── user.model.js                    ← REMOVE: firebaseUid; ADD: refreshTokenHash, emailVerified;
-    │   │                                       CHANGE: email optional, roleType default PENDING;
-    │   │                                       ADD: sparse unique index on email
     │   ├── shop.model.js                    ← REMOVE: Firebase comments
     │   ├── service.model.js                 ← REMOVE: Firebase comments
     │   ├── photo.model.js                   ← REMOVE: Firebase comments
@@ -1625,16 +1635,16 @@ server/
     ├── routes/
     │   └── auth.routes.js                   ← REWRITE: OTP + token + logout routes
     ├── services/
-    │   ├── auth.service.js                  ← REWRITE: JWT tokens, OTP session (creates PENDING user),
+    │   ├── auth.service.js                  ← REWRITE: JWT tokens, OTP session (creates onboardingToken),
     │   │                                       refresh rotation
     │   ├── account.service.js               ← REFACTOR: remove firebase-admin, use JWT revocation
-    │   ├── onboarding.service.js            ← REFACTOR: receives authUser, UPDATES PENDING user
-    │   │                                       (not creates new); ensureUniqueUserIdentity uses userId
+    │   ├── onboarding.service.js            ← REFACTOR: receives phoneNumber, CREATES fully verified user
+    │   │                                       (instead of updating); ensureUniqueUserIdentity uses email/phone combo
     │   ├── shop.service.js                  ← UPDATE: decouple shop.emailId from user.email sync
     │   ├── otp.service.js                   ← NEW
     │   └── sms-provider.service.js          ← NEW
     ├── utils/
-    │   ├── constants.js                     ← ADD: PENDING role, OTP + TOKEN_TYPE constants
+    │   ├── constants.js                     ← ADD: ONBOARDING token type, OTP + TOKEN_TYPE constants
     │   └── logger.js                        ← UPDATE: rename "Firebase private keys" comment
     └── validators/
         ├── auth.validator.js                ← REWRITE: OTP + token schemas
@@ -1653,38 +1663,39 @@ server/
 - [ ] `config/index.js` updated — `firebase` section removed, `msg91` + `jwt` sections added
 - [ ] `sms-provider.service.js` created and tested
 - [ ] `otp.service.js` created and tested
-- [ ] `auth.service.js` fully rewritten — creates PENDING users, always issues tokens
+- [ ] `auth.service.js` fully rewritten — issues `onboardingToken` for new users, `accessToken` for returning
 - [ ] `auth.validator.js` rewritten with OTP/token schemas
 - [ ] `otp-rate-limiter.middleware.js` created
 - [ ] `auth.controller.js` rewritten — always returns tokens (new + returning users)
 - [ ] `auth.routes.js` rewritten with all new routes
-- [ ] `authenticate.middleware.js` rewritten for JWT-only — includes `emailVerified` in `req.user`
-- [ ] `authorize.middleware.js` updated — `isNewUser` → `ROLES.PENDING` check
+- [ ] `authenticate.middleware.js` rewritten for JWT-only — explicit rejection of onboarding tokens
+- [ ] `authenticate-onboarding.middleware.js` added — valid onboarding tokens allowed
+- [ ] `authorize.middleware.js` updated — obsolete `isNewUser` check removed entirely
 - [ ] `user.model.js` changes applied:
   - [ ] `firebaseUid` removed
   - [ ] `refreshTokenHash` added (select: false)
-  - [ ] `email` changed to optional (required: false, default: null)
   - [ ] `emailVerified` added (Boolean, default: false)
-  - [ ] `roleType` default changed from `CUSTOMER` to `PENDING`
-  - [ ] Sparse unique index on `email` added
+  - [ ] Keeps `email` strictly required and strictly unique
 - [ ] `user.repository.js` — `findByFirebaseUid()` removed, `findByIdWithRefreshHash()` added
-- [ ] `constants.js` updated — `PENDING` role added, OTP + TOKEN_TYPE constants
+- [ ] `constants.js` updated — `ONBOARDING` token type added, OTP + TOKEN_TYPE constants
 - [ ] `account.service.js` refactored to use JWT revocation
-- [ ] `onboarding.controller.js` refactored — passes `req.user` (not phoneNumber)
-- [ ] `onboarding.service.js` refactored — receives `authUser`, UPDATES existing PENDING user
-- [ ] `onboarding.service.js` — `ensureUniqueUserIdentity` uses `userId` (not `firebaseUid`/`phoneNumber`)
+- [ ] `onboarding.controller.js` refactored — relies on `req.onboardingContext.phoneNumber`
+- [ ] `onboarding.service.js` refactored — explicitly CREATES user upon completion of the profile
 - [ ] `onboarding.validator.js` — `phoneNumber` removed from customer + barber schemas
-- [ ] `shop.service.js` — `emailId` → `user.email` auto-sync removed in `updateBusinessInfo()`
+- [ ] `shop.model.js` — `emailId` and `phoneNumber` fields deleted completely
+- [ ] `shop.service.js` — Removed insecure `userUpdates` sync logic and pruned `ALLOWED_UPDATE_FIELDS`
+- [ ] `shop.validator.js` and `onboarding.validator.js` — `emailId` & `phoneNumber` stripped out
+- [ ] `barber-profile.utils.js` — serialization functions updated to join identity from `User` instead of `Shop`
 - [ ] `barber-profile.controller.js` updated to pass `req.user._id` to `signOutEverywhere`
 - [ ] `upload.middleware.js` — `firebaseUid` fallback removed
 - [ ] Firebase-related model comments removed
 - [ ] Seed script updated to use `phoneNumber` identity
 - [ ] All OTP endpoints tested (test mode)
 - [ ] Refresh token rotation tested (happy path + theft detection)
-- [ ] PENDING → CUSTOMER onboarding flow tested end-to-end
-- [ ] PENDING → BARBER onboarding flow tested end-to-end
-- [ ] PENDING user blocked from non-onboarding routes (403 test)
-- [ ] Already-onboarded user blocked from re-onboarding (409 test)
+- [ ] New user → OTP → onboardingToken → CUSTOMER onboarding flow tested end-to-end
+- [ ] New user → OTP → onboardingToken → BARBER onboarding flow tested end-to-end
+- [ ] Onboarding tokens blocked from standard API routes (401 test)
+- [ ] Already-onboarded user bypassing OTP to reuse old onboarding token is blocked (409 test)
 - [ ] Rate limiting tested (send + verify)
 - [ ] `rg "firebase" src/` returns zero matches
 
@@ -1710,11 +1721,11 @@ See **[`MSG91-POSTMAN-UPDATES-GUIDE.md`](./MSG91-POSTMAN-UPDATES-GUIDE.md)** for
 
 - [ ] App updated to use `/auth/otp/send` and `/auth/otp/verify`
 - [ ] App handles `isNewUser: true` response → navigates to onboarding with token stored
-- [ ] App sends `Bearer <accessToken>` in onboarding requests
+- [ ] App sends `Bearer <onboardingToken>` in onboarding requests
 - [ ] Token storage uses device secure storage (Keychain/Keystore)
 - [ ] Auto-refresh logic implemented using `/auth/token/refresh`
 - [ ] Logout calls `/auth/logout`
-- [ ] Error handling for 401 (redirect to login), 403 (redirect to onboarding if PENDING), and 429 (show retry timer)
+- [ ] Error handling for 401 (redirect to login), and 429 (show retry timer)
 
 ---
 
