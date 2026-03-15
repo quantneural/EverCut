@@ -281,7 +281,7 @@ const user = await userRepository.create({
 
 ---
 
-### VIOLATION-02 — Barber Onboarding Trusts Client-Supplied `phoneNumber` and `emailId`
+### VIOLATION-02 — Barber Onboarding Trusts Client-Supplied `phoneNumber` and `email`
 
 | | |
 |---|---|
@@ -299,12 +299,12 @@ const phoneNumber = String(shopData.phoneNumber || authUser?.phoneNumber || '').
 const user = await userRepository.create({
     firebaseUid,
     phoneNumber: normalized.phoneNumber,  // ← Could be from req.body
-    email: normalized.emailId,            // ← From req.body
+    email: normalized.email,              // ← From req.body
     roleType: ROLES.BARBER,
 });
 ```
 
-**Issue:** The normalization function prioritizes `shopData.phoneNumber` (client input) over `authUser.phoneNumber` (from `req.user`). The `emailId` has no verified source at all — it comes entirely from the request body. This means a barber can register with any phone number or email.
+**Issue:** The normalization function prioritizes `shopData.phoneNumber` (client input) over `authUser.phoneNumber` (from `req.user`). The email value also comes from the request body rather than a verified identity source. This means a barber can register with any phone number or email.
 
 **Risk:** Identity spoofing — a barber could register a shop with someone else's contact information, undermining the trust model for the entire platform.
 
@@ -312,8 +312,8 @@ const user = await userRepository.create({
 ```javascript
 // Enforce: phoneNumber and email MUST come from Firebase-verified token
 const phoneNumber = String(authUser?.phoneNumber || '').trim();
-const emailId = String(authUser?.email || shopData.emailId || shopData.email || '').trim().toLowerCase();
-// The shop form can provide emailId only as a FALLBACK if Firebase didn't supply one
+const email = String(authUser?.email || shopData.email || '').trim().toLowerCase();
+// The shop form can provide email only as a FALLBACK if Firebase didn't supply one
 ```
 
 ---
@@ -348,7 +348,7 @@ Either:
 
 ---
 
-### VIOLATION-04 — Business Info Update Accepts `phoneNumber` and `emailId` from Body
+### VIOLATION-04 — Business Info Update Accepts `phoneNumber` and `email` from Body
 
 | | |
 |---|---|
@@ -358,8 +358,8 @@ Either:
 **Code:**
 ```javascript
 // shop.service.js L302-313
-if (updateData.emailId) {
-    const existingEmailUser = await userRepository.findByEmail(updateData.emailId);
+if (updateData.email) {
+    const existingEmailUser = await userRepository.findByEmail(updateData.email);
     if (existingEmailUser && String(existingEmailUser._id) !== String(ownerId)) {
         throw new ConflictError('Email already registered');
     }
@@ -375,7 +375,7 @@ if (updateData.phoneNumber) {
 // shop.service.js L316-323
 const updated = await shopRepository.updateByOwnerId(ownerId, updateData);
 const userUpdates = {};
-if (updateData.emailId) userUpdates.email = updateData.emailId;
+if (updateData.email) userUpdates.email = updateData.email;
 if (updateData.phoneNumber) userUpdates.phoneNumber = updateData.phoneNumber;
 if (Object.keys(userUpdates).length > 0) {
     await userRepository.updateById(ownerId, userUpdates);
@@ -389,7 +389,7 @@ if (Object.keys(userUpdates).length > 0) {
 **Recommended Fix:**
 - Phone number changes should require SMS re-verification via Firebase.
 - Email changes should require email verification.
-- At minimum, remove `phoneNumber` and `emailId` from `ALLOWED_UPDATE_FIELDS` for the User model sync — only allow updating these on the Shop model as display/contact fields, keeping the User identity fields locked to Firebase-verified values.
+- At minimum, remove `phoneNumber` and `email` from `ALLOWED_UPDATE_FIELDS` for the User model sync — only allow updating these on the Shop model as display/contact fields, keeping the User identity fields locked to Firebase-verified values.
 
 ---
 
