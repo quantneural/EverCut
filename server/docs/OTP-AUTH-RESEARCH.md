@@ -579,6 +579,22 @@ const { accessToken, refreshToken } = await fetch('/api/auth/verify-otp', {
 
 ---
 
+### 5.4 Sandbox / Test Environment Comparison
+
+MSG91 does **not** provide any official sandbox, test API keys, test phone numbers, or test OTP codes. Development testing requires an application-level bypass (a `testMode` flag that skips real API calls and accepts a hardcoded OTP). This is the standard approach used by the broader MSG91 developer community.
+
+| Feature | Firebase Auth | Twilio Verify | MSG91 |
+|---|---|---|---|
+| **Official sandbox/test mode** | Yes (test phone numbers in console) | Yes (test credentials) | None |
+| **Test phone numbers** | Up to 10 custom numbers per project | Magic numbers (`+15005550006`, etc.) | None |
+| **Test OTP/verification codes** | Developer-defined 6-digit codes | Simulated (no real SMS sent) | None |
+| **Separate test API keys** | N/A (console config) | Test Account SID + Auth Token | None |
+| **Prevents real SMS in dev** | Yes (test numbers skip SMS) | Yes (test credentials skip SMS) | No (application-level bypass required) |
+| **Cost during testing** | Free (test numbers) | Free (test credentials) | Real SMS costs (unless bypassed in code) |
+| **Recommended dev approach** | Register fictional numbers in Firebase console | Use test credentials from Twilio console | Application-level `testMode` flag in backend config |
+
+---
+
 ## 6. Scalability & Architecture
 
 ### 6.1 Firebase Authentication
